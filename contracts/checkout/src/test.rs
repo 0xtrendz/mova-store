@@ -509,5 +509,47 @@ fn test_events_emitted() {
             ),
         ]
     );
-    assert_eq!(data_i128(ev_refund), amount, "OrderRefunded data amount mismatch");
+    // A refund emits `refund` with the order id and buyer as topics. SDK 27
+    // reports the events of the latest invocation only, so assert it on a
+    // fresh order rather than after the dispatch above.
+    let refund_id = order_id(&env, 6);
+    client.create_order(&buyer, &refund_id, &token, &10_000);
+    client.pay(&token, &buyer, &refund_id, &10_000);
+    client.refund(&refund_id);
+    assert_eq!(
+        env.events().all().filter_by_contract(&checkout),
+        vec![
+            &env,
+            (
+                checkout.clone(),
+                (Symbol::new(&env, "refund"), refund_id.clone(), buyer.clone()).into_val(&env),
+                map![&env, (Symbol::new(&env, "amount"), amount)].into_val(&env),
+            ),
+        ]
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Reads on an uninitialized contract
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_reads_on_uninitialized_contract() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract = env.register(Checkout, ());
+    let client = CheckoutClient::new(&env, &contract);
+    let id = order_id(&env, 31);
+
+    // `merchant()` is the first call an operator makes after deploying, so it
+    // must surface NotInitialized on a fresh contract instead of panicking or
+    // handing back a default address.
+    let result = client.try_merchant();
+    assert_eq!(result, Err(Ok(Error::NotInitialized)));
+
+    // The order-scoped reads document their empty state too.
+    assert_eq!(client.order(&id), None);
+    assert_eq!(client.status(&id), None);
+    assert!(!client.is_paid(&id));
 }
