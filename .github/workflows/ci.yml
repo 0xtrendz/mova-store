@@ -43,11 +43,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Order matters: a step that fails skips every step after it. Formatting is
+      # therefore reported last on purpose, so a repo-wide style drift cannot hide
+      # the results of the type check, the tests and the build.
       - name: Run ESLint
         run: npm run lint
-
-      - name: Check code formatting
-        run: npm run format:check
 
       - name: Type check
         run: npm run type-check
@@ -69,6 +69,10 @@ jobs:
           NEXT_PUBLIC_EMAILJS_SERVICE_ID: service_dummy
           NEXT_PUBLIC_EMAILJS_TEMPLATE_ID: template_dummy
           NEXT_PUBLIC_EMAILJS_PUBLIC_KEY: dummy_key
+
+      # Reported last: see the note above the ESLint step.
+      - name: Check code formatting
+        run: npm run format:check
 
   # Soroban contract checks
   contracts:
