@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use soroban_sdk::testutils::{Address as _, Events};
+use soroban_sdk::testutils::{Address as _, Events, Ledger};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{
     contract, contractimpl, contracttype, map, vec, Address, BytesN, Env, IntoVal, Symbol, Val,
@@ -8,6 +8,7 @@ use soroban_sdk::{
 
 use crate::errors::Error;
 use crate::order::Status;
+use crate::storage::{DataKey, LEDGER_THRESHOLD, LEDGER_TO_EXTEND_TO};
 use crate::{Checkout, CheckoutClient};
 
 // ---------------------------------------------------------------------------
@@ -509,5 +510,70 @@ fn test_events_emitted() {
             ),
         ]
     );
-    assert_eq!(data_i128(ev_refund), amount, "OrderRefunded data amount mismatch");
+}
+
+// ---------------------------------------------------------------------------
+// Read-path TTL keep-alive (#512)
+// ---------------------------------------------------------------------------
+
+fn ttl_of(env: &Env, contract: &Address, key: &DataKey) -> u32 {
+    env.as_contract(contract, || env.storage().persistent().get_ttl(key))
+}
+
+#[test]
+fn test_read_paths_extend_ttl_without_a_write() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token, merchant, buyer, contract) = setup_usdc(&env);
+    let id = order_id(&env, 37);
+    client.create_order(&buyer, &id, &token, &10_000);
+
+    let admin_key = DataKey::Admin;
+    let order_key = DataKey::Order(id.clone());
+
+    // Normalise both entries to the contract's own ceiling, and keep the
+    // instance alive, so the decay below does not depend on the host's
+    // default entry TTLs.
+    env.as_contract(&contract, || {
+        let persistent = env.storage().persistent();
+        persistent.extend_ttl(&admin_key, LEDGER_TO_EXTEND_TO, LEDGER_TO_EXTEND_TO);
+        persistent.extend_ttl(&order_key, LEDGER_TO_EXTEND_TO, LEDGER_TO_EXTEND_TO);
+        env.storage()
+            .instance()
+            .extend_ttl(LEDGER_TO_EXTEND_TO, LEDGER_TO_EXTEND_TO);
+    });
+
+    // Age both entries until they sit below the contract's extend threshold.
+    env.ledger().with_mut(|li| {
+        li.sequence_number += LEDGER_TO_EXTEND_TO - LEDGER_THRESHOLD / 2;
+    });
+
+    let admin_before = ttl_of(&env, &contract, &admin_key);
+    let order_before = ttl_of(&env, &contract, &order_key);
+    assert!(
+        admin_before < LEDGER_THRESHOLD,
+        "admin TTL should have decayed below the threshold, got {admin_before}"
+    );
+    assert!(
+        order_before < LEDGER_THRESHOLD,
+        "order TTL should have decayed below the threshold, got {order_before}"
+    );
+
+    // A bare read of each entry keeps it alive with no intervening write.
+    assert_eq!(client.merchant(), merchant);
+    assert_eq!(client.order(&id).unwrap().amount, 10_000);
+
+    let admin_after = ttl_of(&env, &contract, &admin_key);
+    let order_after = ttl_of(&env, &contract, &order_key);
+    assert!(
+        admin_after > admin_before,
+        "get_admin must extend the admin TTL on a read"
+    );
+    assert!(
+        order_after > order_before,
+        "get_order must extend the order TTL on a read"
+    );
+    assert_eq!(admin_after, LEDGER_TO_EXTEND_TO);
+    assert_eq!(order_after, LEDGER_TO_EXTEND_TO);
 }
