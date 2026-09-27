@@ -26,7 +26,11 @@ import {
   tokenForContract,
 } from "./config";
 import { connectWallet, signWithFreighter } from "./freighter";
-import { hashOrderId, bytesToHex, hexToBytes } from "./scval";
+import { hashOrderId, bytesToHex, hexToBytes, resolveOrderIdHash } from "./scval";
+
+// `resolveOrderIdHash` is used by dispatchOrder/refundOrder below and is part of
+// this module's public API, so keep it exported for callers and the test suite.
+export { resolveOrderIdHash };
 
 // ---------------------------------------------------------------------------
 // Types
