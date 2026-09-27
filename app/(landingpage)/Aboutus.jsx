@@ -19,9 +19,9 @@ export default function AboutUs() {
           <p className="text-sm uppercase tracking-widest text-mova-soft font-semibold mb-3">
             Our Mission
           </p>
-          <h1 className="font-display text-3xl sm:text-4xl font-bold mb-6">
+          <h2 className="font-display text-3xl sm:text-4xl font-bold mb-6">
             Bringing Stellar payments to everyday commerce
-          </h1>
+          </h2>
           <p className="text-lg text-purple-100/70 leading-relaxed max-w-3xl mx-auto">
             Mova Store is more than a shoe store — it's a working proof-of-concept
             showing how any e-commerce business can accept Stellar USDC payments
@@ -55,9 +55,9 @@ export default function AboutUs() {
                   Open Source
                 </span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-4">
+              <h3 className="text-2xl sm:text-3xl font-bold mb-4">
                 Built in public, for everyone
-              </h2>
+              </h3>
               <p className="text-gray-300 leading-relaxed mb-6">
                 Mova Store is fully open source under the MIT license. Fork it,
                 learn from it, or contribute to make crypto payments accessible
