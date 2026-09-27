@@ -5,6 +5,12 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  # Lets a maintainer run this workflow on any branch in this repository. That is
+  # how pull requests opened from forks get verified: GitHub gates their own runs
+  # behind an approval step, so the branch is mirrored into this repository and
+  # dispatched here instead. Without this, a fork pull request can sit with no CI
+  # result at all.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
