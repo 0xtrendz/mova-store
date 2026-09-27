@@ -614,7 +614,10 @@ fn test_admin_ttl_is_extended_to_policy_target_on_write() {
 
     // initialize() stored the merchant under DataKey::Admin.
     let initial = persistent_ttl(&env, &checkout, &DataKey::Admin);
-    assert!(initial > 0, "the admin entry must carry a TTL after a write");
+    assert!(
+        initial > 0,
+        "the admin entry must carry a TTL after a write"
+    );
 
     assert!(initial >= LEDGER_THRESHOLD);
     env.ledger()
@@ -636,5 +639,8 @@ fn test_ttl_policy_threshold_is_below_extension_target() {
     // Guards the invariant the two tests above rely on: extend_ttl only fires
     // when the remaining TTL is below the threshold, so the threshold must be
     // strictly smaller than the extension target.
-    assert!(LEDGER_THRESHOLD < LEDGER_TO_EXTEND_TO);
+    //
+    // Evaluated at compile time, so inverting the policy fails the build
+    // rather than silently disabling TTL refresh.
+    const { assert!(LEDGER_THRESHOLD < LEDGER_TO_EXTEND_TO) };
 }
