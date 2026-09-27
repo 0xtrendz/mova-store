@@ -508,6 +508,31 @@ fn test_events_emitted() {
             ),
         ]
     );
+
+    // Refund is the last event of the lifecycle and publishes
+    // `(refund, order_id, buyer)` with `{ amount }` data. It runs on a separate
+    // order because a dispatched order can no longer be refunded, and it must be
+    // asserted here: `lib/stellar/events.ts` and the indexer decode this exact
+    // topic order, so a silent layout change would break refund reconciliation.
+    let refund_id = order_id(&env, 6);
+    client.pay(&token, &buyer, &refund_id, &10_000);
+    client.refund(&refund_id);
+    assert_eq!(
+        env.events().all().filter_by_contract(&checkout),
+        vec![
+            &env,
+            (
+                checkout.clone(),
+                (
+                    Symbol::new(&env, "refund"),
+                    refund_id.clone(),
+                    buyer.clone(),
+                )
+                    .into_val(&env),
+                map![&env, (Symbol::new(&env, "amount"), amount)].into_val(&env),
+            ),
+        ]
+    );
 }
 
 // ---------------------------------------------------------------------------
