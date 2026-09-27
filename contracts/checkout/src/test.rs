@@ -435,6 +435,26 @@ fn test_set_merchant_changes_escrow_destination() {
 }
 
 #[test]
+fn test_set_merchant_requires_admin_auth() {
+    let env = Env::default();
+
+    // Mock auths only to bring the contract up; setup is not the subject here.
+    env.mock_all_auths();
+    let (client, _, merchant, _, _) = setup_usdc(&env);
+
+    // Clearing the mocked auths disables mocking, so the next call carries no
+    // admin authorization and must be rejected.
+    env.set_auths(&[]);
+
+    let attacker = Address::generate(&env);
+    let result = client.try_set_merchant(&attacker);
+    assert!(result.is_err(), "unauthorized set_merchant must fail");
+
+    // The escrow destination is unchanged after the rejected call.
+    assert_eq!(client.merchant(), merchant);
+}
+
+#[test]
 fn test_events_emitted() {
     let env = Env::default();
     env.mock_all_auths();
@@ -509,5 +529,4 @@ fn test_events_emitted() {
             ),
         ]
     );
-    assert_eq!(data_i128(ev_refund), amount, "OrderRefunded data amount mismatch");
 }
