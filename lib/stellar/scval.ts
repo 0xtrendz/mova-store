@@ -39,7 +39,9 @@ export function bytes32ToScVal(bytes: Uint8Array | string): xdr.ScVal {
   if (arr.length !== 32) {
     throw new Error(`order_id must be exactly 32 bytes (got ${arr.length})`);
   }
-  return xdr.ScVal.scvBytes(arr as any);
+  // Pass a copy: `scvBytes` retains the reference it is handed, so without this a
+  // later mutation of the caller's array would silently change the built ScVal.
+  return xdr.ScVal.scvBytes(toSdkBytes(arr.slice()));
 }
 
 /**
