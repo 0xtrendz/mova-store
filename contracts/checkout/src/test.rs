@@ -509,5 +509,47 @@ fn test_events_emitted() {
             ),
         ]
     );
-    assert_eq!(data_i128(ev_refund), amount, "OrderRefunded data amount mismatch");
+    // A refund emits `refund` with the order id and buyer as topics. SDK 27
+    // reports the events of the latest invocation only, so assert it on a
+    // fresh order rather than after the dispatch above.
+    let refund_id = order_id(&env, 6);
+    client.create_order(&buyer, &refund_id, &token, &10_000);
+    client.pay(&token, &buyer, &refund_id, &10_000);
+    client.refund(&refund_id);
+    assert_eq!(
+        env.events().all().filter_by_contract(&checkout),
+        vec![
+            &env,
+            (
+                checkout.clone(),
+                (Symbol::new(&env, "refund"), refund_id.clone(), buyer.clone()).into_val(&env),
+                map![&env, (Symbol::new(&env, "amount"), amount)].into_val(&env),
+            ),
+        ]
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Reads after a refund
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_status_and_is_paid_after_refund() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token, _, buyer, checkout) = setup_usdc(&env);
+    let id = order_id(&env, 33);
+
+    client.pay(&token, &buyer, &id, &100_000);
+    assert!(client.is_paid(&id));
+
+    client.refund(&id);
+
+    // Refunded is the boundary of `is_paid`: the escrow went back to the buyer,
+    // so the order is no longer considered settled.
+    assert_eq!(client.status(&id), Some(Status::Refunded));
+    assert!(!client.is_paid(&id));
+    assert_eq!(usdc_balance(&env, &token, &checkout), 0);
+    assert_eq!(usdc_balance(&env, &token, &buyer), 1_000_000);
 }
