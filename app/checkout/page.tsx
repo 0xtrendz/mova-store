@@ -100,9 +100,10 @@ const Checkout = () => {
     try {
       await sendMail({
         name: `${formData.firstName} ${formData.lastName}`,
+        // The recipient is pinned to this validated address inside sendMail;
+        // callers can no longer choose an arbitrary recipient.
         email: formData.email,
         message: `You are about to checkout your cart on Mova Store. Your OTP is: ${otp}`,
-        recipientEmail: formData.email,
         subject: formData.subject,
       });
 
