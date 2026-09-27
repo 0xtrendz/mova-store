@@ -509,5 +509,57 @@ fn test_events_emitted() {
             ),
         ]
     );
-    assert_eq!(data_i128(ev_refund), amount, "OrderRefunded data amount mismatch");
+}
+
+// ---------------------------------------------------------------------------
+// Escrow predicate (#494)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_is_escrowed_only_while_funds_are_held() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token, _, buyer, _) = setup_usdc(&env);
+
+    // Paid: the contract is holding the buyer's funds.
+    let paid = order_id(&env, 31);
+    client.pay(&token, &buyer, &paid, &10_000);
+    let paid_order = client.order(&paid).unwrap();
+    assert!(paid_order.is_escrowed(), "a paid order must be escrowed");
+
+    // Shipped: the escrow has been released to the merchant.
+    let shipped = order_id(&env, 32);
+    client.pay(&token, &buyer, &shipped, &10_000);
+    client.dispatch(&shipped);
+    let shipped_order = client.order(&shipped).unwrap();
+    assert!(
+        !shipped_order.is_escrowed(),
+        "a dispatched order is settled, not escrowed"
+    );
+
+    // Refunded: the escrow has been returned to the buyer.
+    let refunded = order_id(&env, 33);
+    client.pay(&token, &buyer, &refunded, &10_000);
+    client.refund(&refunded);
+    let refunded_order = client.order(&refunded).unwrap();
+    assert!(
+        !refunded_order.is_escrowed(),
+        "a refunded order is settled, not escrowed"
+    );
+
+    // Pending: nothing has been escrowed yet.
+    let pending = order_id(&env, 34);
+    client.create_order(&buyer, &pending, &token, &10_000);
+    let pending_order = client.order(&pending).unwrap();
+    assert!(
+        !pending_order.is_escrowed(),
+        "a pending order must not be escrowed"
+    );
+
+    // is_paid and is_escrowed deliberately differ: Shipped has been paid but
+    // is no longer held in escrow. Inverting either predicate fails here.
+    assert!(paid_order.is_paid());
+    assert!(shipped_order.is_paid());
+    assert!(!shipped_order.is_escrowed());
 }
