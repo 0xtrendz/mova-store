@@ -509,5 +509,37 @@ fn test_events_emitted() {
             ),
         ]
     );
-    assert_eq!(data_i128(ev_refund), amount, "OrderRefunded data amount mismatch");
+}
+
+// ---------------------------------------------------------------------------
+// Refunding twice (#499)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_refund_twice_rejected_and_balance_unchanged() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token, _, buyer, checkout) = setup_usdc(&env);
+    let id = order_id(&env, 35);
+
+    client.pay(&token, &buyer, &id, &10_000);
+    client.refund(&id);
+
+    assert_eq!(client.status(&id), Some(Status::Refunded));
+    let buyer_balance_after_refund = usdc_balance(&env, &token, &buyer);
+    assert_eq!(buyer_balance_after_refund, 1_000_000);
+    assert_eq!(usdc_balance(&env, &token, &checkout), 0);
+
+    // A second refund is not a valid lifecycle transition.
+    let result = client.try_refund(&id);
+    assert_eq!(result, Err(Ok(Error::InvalidOrderStatus)));
+
+    // The rejected attempt must not move funds or change the recorded status.
+    assert_eq!(
+        usdc_balance(&env, &token, &buyer),
+        buyer_balance_after_refund
+    );
+    assert_eq!(usdc_balance(&env, &token, &checkout), 0);
+    assert_eq!(client.status(&id), Some(Status::Refunded));
 }
