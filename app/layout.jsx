@@ -64,15 +64,16 @@ const RootLayout = ({ children }) => {
         />
       </Head>
       <body className="h-full font-body antialiased">
+        {/* Single skip link — first focusable element in the document. */}
         <SkipLink />
         <NextTopLoader color="#7c3aed" showSpinner={false} />
-        <SkipLink />
 
         <AuthProvider>
-          <SkipLink />
           <div className="flex flex-col min-h-screen">
             <Navbar />
-            <main id="main-content" className="app flex-grow pt-10">{children}</main>
+            <ErrorBoundary>
+              <main id="main-content" className="app flex-grow pt-10">{children}</main>
+            </ErrorBoundary>
             <Whatsapp />
             <ScrollToTop />
             <Footer />
