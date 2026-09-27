@@ -10,7 +10,6 @@ import { AuthProvider } from "../lib/AuthContext";
 import Head from "next/head";
 import logo from "../public/images/favicon.ico";
 import ErrorBoundary from "../components/ErrorBoundary";
-import SkipLink from "../components/SkipLink";
 
 const syne = Syne({
   subsets: ["latin"],

@@ -19,23 +19,15 @@ import {
   FaCreditCard,
 } from "react-icons/fa";
 import { BsBank, BsCalendarDate } from "react-icons/bs";
-import { SiKlarna } from "react-icons/si";
+import { SiKlarna, SiStellar } from "react-icons/si";
 import sendMail from "../../lib/sendmail";
-import { validateOTP } from "../../lib/validation";
 import StellarCheckoutButton from "../../components/StellarCheckoutButton";
 import StellarWalletButton from "../../components/StellarWalletButton";
 import StellarOrderWatch from "../../components/StellarOrderWatch";
-import { SiStellar } from "react-icons/si";
-import { SUPPORTED_TOKENS, defaultToken, TokenConfig } from "../../lib/stellar/config";
+import { SUPPORTED_TOKENS, defaultToken, TokenConfig, NETWORK } from "../../lib/stellar/config";
 import { convertUsdToXlm, DEFAULT_XLM_USD_PRICE } from "../../lib/stellar/price";
 import {
-  SUPPORTED_TOKENS,
-  defaultToken,
-  TokenConfig,
-  NETWORK,
-} from "../../lib/stellar/config";
-import { convertUsdToXlm, DEFAULT_XLM_USD_PRICE } from "../../lib/stellar/price";
-import {
+  validateOTP,
   validateEmail,
   validateName,
   validateAddress,
