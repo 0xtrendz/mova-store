@@ -8,6 +8,9 @@
    - Set `NEXT_PUBLIC_ADMIN_EMAILS` to your email (e.g. `NEXT_PUBLIC_ADMIN_EMAILS=admin@example.com`). Multiple emails can be comma-separated.
    - `AuthContext` reads this variable via `isAdminEmail` (`lib/env.ts`), and `components/AdminGuard.jsx` uses it to gate all `/admin` routes. If left unset, `isAdmin` defaults to `false` and authenticated users will be blocked with an "Access Denied" error when attempting to reach the admin catalog panel.
 4. In the SQL editor, run [`schema.sql`](./schema.sql).
+   - It must run top-to-bottom without error. To confirm the script actually reached the end, check that RLS is enabled on `products`:
+     `select relrowsecurity from pg_class where relname = 'products';` → expected `true`.
+     An empty result or `false` means the script aborted part-way and the `orders` table and policies were never created.
 5. Auth → Providers: enable **Email** (and **Google** if you want OAuth).
 6. Auth → URL Configuration: add `http://localhost:3000/**` (and your production URL).
 7. Restart `npm run dev`.

@@ -16,11 +16,11 @@ create index if not exists products_created_at_idx on public.products (created_a
 create index if not exists products_updated_at_idx on public.products (updated_at desc);
 
 create or replace function set_updated_at()
-returns trigger as ''
+returns trigger as $$
 begin
   new.updated_at = now();
   return new;
-end;'' language plpgsql;
+end;$$ language plpgsql;
 
 drop trigger if exists products_updated_at_trigger on public.products;
 create trigger products_updated_at_trigger
