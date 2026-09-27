@@ -441,7 +441,6 @@ fn test_events_emitted() {
 
     let (client, token, merchant, buyer, checkout) = setup_usdc(&env);
     let id = order_id(&env, 5);
-    let amount = 10_000_i128;
 
     let timestamp: Val = env.ledger().timestamp().into_val(&env);
     let amount: Val = 10_000i128.into_val(&env);
