@@ -1,6 +1,7 @@
 #![cfg(test)]
 
-use soroban_sdk::testutils::{Address as _, Events};
+use soroban_sdk::testutils::storage::Persistent as _;
+use soroban_sdk::testutils::{Address as _, Events, Ledger as _};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{
     contract, contractimpl, contracttype, map, vec, Address, BytesN, Env, IntoVal, Symbol, Val,
@@ -8,6 +9,7 @@ use soroban_sdk::{
 
 use crate::errors::Error;
 use crate::order::Status;
+use crate::storage::{DataKey, LEDGER_THRESHOLD, LEDGER_TO_EXTEND_TO};
 use crate::{Checkout, CheckoutClient};
 
 // ---------------------------------------------------------------------------
@@ -561,4 +563,78 @@ fn test_is_escrowed_only_while_funds_are_held() {
     assert!(paid_order.is_paid());
     assert!(shipped_order.is_paid());
     assert!(!shipped_order.is_escrowed());
+}
+
+// ---------------------------------------------------------------------------
+// TTL management (#505)
+// ---------------------------------------------------------------------------
+
+/// Remaining TTL of a persistent key, read from the contract's own storage.
+fn persistent_ttl(env: &Env, contract: &Address, key: &DataKey) -> u32 {
+    env.as_contract(contract, || env.storage().persistent().get_ttl(key))
+}
+
+#[test]
+fn test_order_ttl_is_extended_to_policy_target_on_write() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token, _, buyer, checkout) = setup_usdc(&env);
+    let id = order_id(&env, 41);
+
+    // create_order persists the order; the test env starts the entry at its
+    // minimum persistent TTL.
+    client.create_order(&buyer, &id, &token, &10_000);
+    let initial = persistent_ttl(&env, &checkout, &DataKey::Order(id.clone()));
+    assert!(initial > 0, "the order must carry a TTL after a write");
+
+    // Move to the point where the remaining TTL is just below the refresh
+    // threshold, so the next write must actually extend it.
+    assert!(initial >= LEDGER_THRESHOLD);
+    env.ledger()
+        .set_sequence_number(initial - LEDGER_THRESHOLD + 1);
+
+    // pay() persists the same order again. If set_order stopped calling
+    // extend_ttl the TTL would stay below the policy target and this fails.
+    client.pay(&token, &buyer, &id, &10_000);
+
+    assert_eq!(
+        persistent_ttl(&env, &checkout, &DataKey::Order(id)),
+        LEDGER_TO_EXTEND_TO,
+        "order TTL must be extended to the policy target on write"
+    );
+}
+
+#[test]
+fn test_admin_ttl_is_extended_to_policy_target_on_write() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _, _, checkout) = setup_usdc(&env);
+
+    // initialize() stored the merchant under DataKey::Admin.
+    let initial = persistent_ttl(&env, &checkout, &DataKey::Admin);
+    assert!(initial > 0, "the admin entry must carry a TTL after a write");
+
+    assert!(initial >= LEDGER_THRESHOLD);
+    env.ledger()
+        .set_sequence_number(initial - LEDGER_THRESHOLD + 1);
+
+    // set_merchant() rewrites DataKey::Admin, so set_admin must extend the TTL.
+    let new_merchant = Address::generate(&env);
+    client.set_merchant(&new_merchant);
+
+    assert_eq!(
+        persistent_ttl(&env, &checkout, &DataKey::Admin),
+        LEDGER_TO_EXTEND_TO,
+        "admin TTL must be extended to the policy target on write"
+    );
+}
+
+#[test]
+fn test_ttl_policy_threshold_is_below_extension_target() {
+    // Guards the invariant the two tests above rely on: extend_ttl only fires
+    // when the remaining TTL is below the threshold, so the threshold must be
+    // strictly smaller than the extension target.
+    assert!(LEDGER_THRESHOLD < LEDGER_TO_EXTEND_TO);
 }
