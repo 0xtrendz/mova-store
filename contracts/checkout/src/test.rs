@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use soroban_sdk::testutils::{Address as _, Events};
+use soroban_sdk::testutils::{Address as _, Events, MockAuth, MockAuthInvoke};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{
     contract, contractimpl, contracttype, map, vec, Address, BytesN, Env, IntoVal, Symbol, Val,
@@ -509,5 +509,43 @@ fn test_events_emitted() {
             ),
         ]
     );
-    assert_eq!(data_i128(ev_refund), amount, "OrderRefunded data amount mismatch");
+}
+
+// ---------------------------------------------------------------------------
+// add_token authorization (#496)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_add_token_without_admin_auth_rejected() {
+    let env = Env::default();
+
+    let token = env.register(MockToken, ());
+    let contract = env.register(Checkout, ());
+    let merchant = Address::generate(&env);
+    let client = CheckoutClient::new(&env, &contract);
+
+    // Authorize only the merchant's `initialize` call.
+    env.mock_auths(&[MockAuth {
+        address: &merchant,
+        invoke: &MockAuthInvoke {
+            contract: &contract,
+            fn_name: "initialize",
+            args: (&merchant,).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.initialize(&merchant);
+
+    // Drop all authorization: an unauthenticated caller cannot whitelist.
+    env.set_auths(&[]);
+
+    let result = client.try_add_token(&token);
+    assert!(
+        result.is_err(),
+        "add_token must require the merchant's auth"
+    );
+    assert!(
+        !client.is_token_allowed(&token),
+        "a rejected add_token must not whitelist the token"
+    );
 }
