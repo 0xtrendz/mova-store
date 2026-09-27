@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useCart } from "../../context/CartContext";
 import Image from "next/image";
 import Link from "next/link";
@@ -8,7 +8,7 @@ import Cart from "../../components/Cart";
 import Modal from "../../components/Modal";
 import Toast from "../../components/Toast";
 import useToast from "../../hooks/useToast";
-import { listProducts } from "../../lib/products";
+import { useProducts } from "../../hooks/useProducts";
 import { ProductGridSkeleton } from "../../components/Skeleton";
 
 export default function Products() {
@@ -16,32 +16,7 @@ export default function Products() {
   const { toast, showToast, hideToast } = useToast(3000);
   const [showModal, setShowModal] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchProducts = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await listProducts();
-        if (isMounted) {
-          setProducts(data);
-        }
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const { products, loading, error } = useProducts();
 
   const handleCheckout = (e) => {
     setIsCheckingOut(true);
@@ -100,11 +75,7 @@ export default function Products() {
             // Only when the fetch resolved empty. On rejection the error above
             // is the whole story, and showing "no products yet" beside it would
             // read as an empty catalogue rather than a failed request.
-            !error && (
-              <p className="text-center py-16 text-mova-ink/70">
-                No products yet.
-              </p>
-            )
+            !error && <p className="text-center py-16 text-mova-ink/70">No products yet.</p>
           )}
         </section>
       </div>
