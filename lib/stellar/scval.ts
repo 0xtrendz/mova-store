@@ -41,7 +41,10 @@ export function bytes32ToScVal(bytes: Uint8Array | string): xdr.ScVal {
   }
   // Pass a copy: `scvBytes` retains the reference it is handed, so without this a
   // later mutation of the caller's array would silently change the built ScVal.
-  return xdr.ScVal.scvBytes(toSdkBytes(arr.slice()));
+  // NOTE: the `as any` widening cast here is deliberately left open-coded - issue
+  // #552 tracks centralizing it behind the `toSdkBytes` helper, so do not fold the
+  // two changes together.
+  return xdr.ScVal.scvBytes(arr.slice() as any);
 }
 
 /**
