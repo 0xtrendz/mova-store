@@ -498,3 +498,13 @@ export function mergeOrderEvents(existing: OrderEvent, incoming: OrderEvent): Or
     amountRaw: existing.amountRaw || incoming.amountRaw,
   };
 }
+
+/**
+ * Singular alias of {@link mergeOrderEvents}.
+ *
+ * The function folds a single incoming event into a single existing row, so the
+ * singular name describes it more accurately, and callers reach for either one.
+ * Both names deliberately share one function reference, so
+ * `mergeOrderEvent === mergeOrderEvents` holds.
+ */
+export const mergeOrderEvent = mergeOrderEvents;
