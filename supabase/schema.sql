@@ -161,3 +161,21 @@ create policy "Users can insert orders"
   to authenticated, anon
   with check (true);
 
+
+-- Orders Row Level Security (update / delete):
+-- These writes are deliberately admin-only. A buyer can never change the status
+-- of their own order from the browser; that would let an unpaid order be marked
+-- 'Paid'. With RLS enabled and no permissive policy for other roles, update and
+-- delete are denied by default for everyone else.
+drop policy if exists "Admins can update orders" on public.orders;
+create policy "Admins can update orders"
+  on public.orders for update
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+drop policy if exists "Admins can delete orders" on public.orders;
+create policy "Admins can delete orders"
+  on public.orders for delete
+  to authenticated
+  using (public.is_admin());
