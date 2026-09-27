@@ -182,33 +182,31 @@ mova-store/
 │   ├── admin/                      #   admin product management
 │   └── profile/login/              #   authentication
 ├── components/                     # Shared UI (Stellar checkout/wallet buttons, Toast…)
+├── context/                        # React context providers (CartContext)
+├── hooks/                          # Custom React hooks (useToast)
 ├── lib/                            # Client-side libraries
-│   ├── stellar/                    #   Soroban payment library
-│   │   ├── config.ts               #     network / contract / token config
-│   │   ├── freighter.ts            #     wallet connect / signing
-│   │   ├── scval.ts                #     ScVal builders + decoders
-│   │   ├── checkout.ts             #     payWithStellar() payment flow
-│   │   ├── account.ts              #     trustline / balance / friendbot
-│   │   ├── simulate.ts             #     pre-flight resource-fee simulation
-│   │   ├── indexer.ts              #     getEvents cursor listener
-│   │   └── events.ts               #     contract event decoding
-│   └── AuthContext.jsx             #   auth + cart context
+│   ├── AuthContext.js              #   auth context provider
+│   └── stellar/                    #   Soroban payment library
+│       ├── config.ts               #     network / contract / token config
+│       ├── freighter.ts            #     wallet connect / signing
+│       ├── scval.ts                #     ScVal builders + decoders
+│       ├── checkout.ts             #     payWithStellar() payment flow
+│       ├── account.ts              #     trustline / balance / friendbot
+│       ├── simulate.ts             #     pre-flight resource-fee simulation
+│       ├── indexer.ts              #     getEvents cursor listener
+│       └── events.ts               #     contract event decoding
 ├── contracts/
 │   └── checkout/                   # Contracts — Rust Soroban smart contract
-│       ├── src/
-│       │   ├── lib.rs              #   entry points (initialize, pay, dispatch, refund…)
-│       │   ├── order.rs            #   Order struct + status lifecycle
-│       │   ├── storage.rs          #   persistent storage + TTL management
-│       │   ├── events.rs           #   PaymentReceived / OrderShipped / OrderRefunded…
-│       │   ├── errors.rs           #   typed error codes
-│       │   └── test.rs             #   mock-token + native-asset integration tests
+│       ├── src/                    #   entry points + storage/events/errors
 │       ├── Cargo.toml
 │       └── README.md               #   contract interface + manual CLI examples
-├── docs/
-│   └── ARCHITECTURE.md             # Deep Stellar integration design rationale
-├── scripts/
-│   └── deploy-testnet.sh           # one-command build + deploy + initialize
-├── public/                         # Static assets (product images)
+├── docs/                           # Architecture, deployment and troubleshooting guides
+├── scripts/                        # deploy-testnet.sh — build + deploy + initialize
+├── public/                         # Static assets (product images, brand)
+├── styles/                         # Global Tailwind CSS (global.css)
+├── supabase/                       # schema.sql, seed.sql + setup notes
+├── tests/                          # Vitest suites (app, components, context, hooks, lib)
+├── __tests__/                      # Legacy Vitest suites (env, errors, events, products, scval)
 ├── .env.local.example              # Config — environment variable template
 ├── package.json                    # Frontend dependencies + scripts
 └── LICENSE
