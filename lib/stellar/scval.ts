@@ -153,7 +153,7 @@ export async function hashOrderId(orderId: string): Promise<Uint8Array> {
  * True when `value` is already a 32-byte order id rendered as hex.
  */
 export function isOrderIdHashHex(value: string): boolean {
-  return /^(0x)?[0-9a-fA-F]{64}$/.test(value);
+  return /^(0[xX])?[0-9a-fA-F]{64}$/.test(value);
 }
 
 /**
