@@ -36,7 +36,10 @@ function Modal({ show, onClose, title = "Dialog", children }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
       role="dialog"
       aria-modal="true"
-      aria-label="Modal dialog"
+      // The dialog's accessible name has to say what this dialog is for. The
+      // hardcoded "Modal dialog" told a screen-reader user the element's role
+      // and nothing else, so every dialog in the app announced identically.
+      aria-label={title}
     >
       <div className="bg-white rounded-lg shadow-lg w-full max-w-md sm:max-w-lg md:max-w-2xl p-6 relative mx-2 max-h-[80vh] overflow-y-auto">
         <button

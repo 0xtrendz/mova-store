@@ -429,7 +429,13 @@ describe("validateEnv", () => {
   });
 });
 
+// Each case re-imports both modules from scratch, and lib/stellar/config pulls
+// in the Stellar SDK, so the default 5s timeout is not enough once the whole
+// suite is competing for the worker — these pass alone and time out in a full
+// run. The work is slow for a real reason, so the budget is raised instead of
+// narrowing what is asserted.
 describe("mainnet RPC default", () => {
+  const MODULE_REIMPORT_TIMEOUT_MS = 30_000;
   const RPC_KEY = "NEXT_PUBLIC_STELLAR_RPC_URL";
   let savedRpc: string | undefined;
 
@@ -460,7 +466,7 @@ describe("mainnet RPC default", () => {
     // Both read NEXT_PUBLIC_STELLAR_RPC_URL, so an operator who leaves it unset
     // must not get a different endpoint depending on which module resolved it.
     expect(RPC_URL).toBe(loadStellarConfig().rpcUrl);
-  });
+  }, MODULE_REIMPORT_TIMEOUT_MS);
 
   it("keeps testnet in step too", async () => {
     vi.stubEnv("NEXT_PUBLIC_STELLAR_NETWORK", "testnet");
@@ -470,5 +476,5 @@ describe("mainnet RPC default", () => {
     const { RPC_URL } = await import("../../lib/stellar/config");
 
     expect(RPC_URL).toBe(loadStellarConfig().rpcUrl);
-  });
+  }, MODULE_REIMPORT_TIMEOUT_MS);
 });
