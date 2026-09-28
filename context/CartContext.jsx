@@ -1,5 +1,13 @@
 "use client";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 const CartContext = createContext();
 
@@ -120,7 +128,7 @@ export const CartProvider = ({ children }) => {
     setTotalPrice(storedTotalPrice);
   }, []);
 
-  const addToCart = (product) => {
+  const addToCart = useCallback((product) => {
     // Each call adds a *new line*, even for a product already in the cart, so
     // the line gets its own identity rather than reusing the product id.
     const cartLine = { ...(product || {}), cartItemId: createCartItemId() };
@@ -170,7 +178,7 @@ export const CartProvider = ({ children }) => {
       } catch {}
       return newTotalPrice;
     });
-  };
+  }, []);
 
   /**
    * Remove a single cart line.
@@ -180,7 +188,7 @@ export const CartProvider = ({ children }) => {
    * removed by identity instead of by array position (or by the shared product
    * id, which would always drop the first duplicate).
    */
-  const removeFromCart = (target) => {
+  const removeFromCart = useCallback((target) => {
     const targetCartItemId =
       typeof target === "string" ? target : target?.cartItemId || null;
     const targetProductId =
@@ -227,9 +235,9 @@ export const CartProvider = ({ children }) => {
       localStorage.setItem("itemCount", nextItemCount.toString());
       localStorage.setItem("totalPrice", nextTotalPrice.toString());
     } catch {}
-  };
+  }, [cartItems, itemCount, totalPrice]);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCartItems([]);
     setItemCount(0);
     setTotalPrice(0);
@@ -238,21 +246,27 @@ export const CartProvider = ({ children }) => {
       localStorage.removeItem("itemCount");
       localStorage.removeItem("totalPrice");
     } catch {}
-  };
+  }, []);
+
+  // One referentially stable value per cart state (Issue #633): without this the
+  // inline object literal is recreated on every provider render, so every
+  // consumer re-renders even when the cart itself has not changed.
+  const contextValue = useMemo(
+    () => ({
+      cartItems,
+      itemCount,
+      totalPrice,
+      hydrated,
+      isHydrated: hydrated,
+      addToCart,
+      removeFromCart,
+      clearCart,
+    }),
+    [cartItems, itemCount, totalPrice, hydrated, addToCart, removeFromCart, clearCart]
+  );
 
   return (
-    <CartContext.Provider
-      value={{
-        cartItems,
-        itemCount,
-        totalPrice,
-        hydrated,
-        isHydrated: hydrated,
-        addToCart,
-        removeFromCart,
-        clearCart,
-      }}
-    >
+    <CartContext.Provider value={contextValue}>
       {children}
     </CartContext.Provider>
   );
