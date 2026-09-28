@@ -218,16 +218,17 @@ npm run test:ui
 ```
 
 **Test file locations:**
-
-- Tests mirror the app tree under `tests/`:
-  - `tests/lib/` for library modules (for example `tests/lib/env.test.ts`)
-  - `tests/components/` for component tests
-  - `tests/context/` and `tests/hooks/` for contexts and hooks
-  - `tests/app/` for route-level tests
-- Shared Vitest setup lives in `tests/setup.ts`.
-- Test files are named `*.test.ts`, `*.test.tsx` or `*.test.jsx` — all three are
-  in use today. Name the file after the module it exercises: PascalCase for a
-  component (`ContactUs.test.tsx`), the module name otherwise.
+- Unit tests: `tests/lib/` for library functions (for example `tests/lib/env.test.ts` and `tests/lib/validation.test.ts`)
+- Shared Vitest setup: `tests/setup.ts`
+- Tests must be named `<kebab-case-stem>.test.ts` or `<kebab-case-stem>.test.tsx`,
+  where the stem is the kebab-case name of the module under test. Dotted
+  qualifiers are allowed for a second concern in the same module, for example
+  `tests/context/cart-context.hydration.test.tsx`.
+- `.js` / `.jsx` test files are not allowed, and two test files in the same
+  directory may not share a stem (case-insensitively) — that is the case-only
+  collision that caused the mix-ups this convention replaces.
+- The rule is enforced in CI and locally with `npm run test:naming`.
+- Put new component tests under `tests/` only when you add them; do not assume a `tests/components/` directory exists yet
 
 **What to test:**
 
@@ -260,6 +261,30 @@ npm run type-check   # TypeScript type checking
 npm run lint         # ESLint checks
 npm run build        # Production build must succeed
 ```
+
+### Local verification (`npm run verify`)
+
+`npm run verify` runs the same checks as CI, in the same order, so a
+contributor can reproduce a green (or red) build locally before pushing:
+
+```bash
+npm run verify
+```
+
+It expands to:
+
+1. `npm run lint` — ESLint
+2. `npm run type-check` — `tsc --noEmit`
+3. `npm run test` — Vitest, single run
+4. `npm run test:coverage` — Vitest with the coverage thresholds
+5. `npm run build` — production Next.js build
+6. `npm run format:check` — Prettier drift report
+
+The build step reads the `NEXT_PUBLIC_*` variables, so copy
+`.env.local.example` to `.env.local` (or export the values) before running
+`verify`; CI injects throwaway values into `npm run build` for the same reason.
+Formatting is checked last on purpose, exactly as in CI, so repo-wide style
+drift cannot hide a failing type check, test, or build.
 
 ### Manual QA for Payment Changes
 
@@ -315,6 +340,7 @@ Before opening a PR, verify:
 - [ ] Frontend tests pass (`npm run test`).
 - [ ] Contract tests pass (`cd contracts/checkout && cargo test`).
 - [ ] Build succeeds (`npm run build`).
+- [ ] Combined local check passes (`npm run verify`)
 - [ ] New behavior has tests; existing tests updated where needed.
 - [ ] No secrets, `.env` files, or build artifacts in the diff.
 - [ ] README/docs updated if behavior or config changed.
