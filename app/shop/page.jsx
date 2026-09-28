@@ -1,14 +1,14 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useCart } from "../../context/CartContext";
 import Image from "next/image";
 import Link from "next/link";
 import { FaShoppingCart } from "react-icons/fa";
 import Cart from "../../components/Cart";
-import Modal from "../../components/Modal";
+import CartModal from "../../components/CartModal";
 import Toast from "../../components/Toast";
 import useToast from "../../hooks/useToast";
-import { listProducts } from "../../lib/products";
+import { useProducts } from "../../hooks/useProducts";
 import { ProductGridSkeleton } from "../../components/Skeleton";
 
 export default function Products() {
@@ -16,32 +16,7 @@ export default function Products() {
   const { toast, showToast, hideToast } = useToast(3000);
   const [showModal, setShowModal] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchProducts = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await listProducts();
-        if (isMounted) {
-          setProducts(data);
-        }
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const { products, loading, error } = useProducts();
 
   const handleCheckout = (e) => {
     setIsCheckingOut(true);
@@ -100,63 +75,21 @@ export default function Products() {
             // Only when the fetch resolved empty. On rejection the error above
             // is the whole story, and showing "no products yet" beside it would
             // read as an empty catalogue rather than a failed request.
-            !error && (
-              <p className="text-center py-16 text-mova-ink/70">
-                No products yet.
-              </p>
-            )
+            !error && <p className="text-center py-16 text-mova-ink/70">No products yet.</p>
           )}
         </section>
       </div>
 
       <Toast message={toast.message} show={toast.show} onClose={hideToast} />
-      <Modal show={showModal} onClose={closeModal}>
-        <h2 className="text-2xl mb-4">Cart Items</h2>
-        {cartItems.length === 0 ? (
-          <p>Your cart is empty.</p>
-        ) : (
-          <div>
-            {cartItems.map((item, index) => (
-              <div
-                key={item.cartItemId || item.lineId || `${item.id}-${index}`}
-                className="flex justify-between items-center mb-2"
-              >
-                <div className="w-16 h-16 flex-shrink-0">
-                  <Image
-                    src={item.img} // Ensure this URL is correct
-                    width={64}
-                    height={64}
-                    alt={`${item.name} image`}
-                    className="object-cover w-full h-full"
-                  />
-                </div>
-                <span className="ml-4">{item.name}</span>
-                <span className="ml-4">${item.price}</span>
-                <button
-                  className="ml-4 bg-purple-500 text-white px-2 py-1 rounded"
-                  onClick={() => removeFromCart(item)}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="flex justify-between items-center mt-4 mx-5 sm:mx-10">
-          <div>
-            {cartItems.length > 0 && <strong>Total:</strong>}
-            {totalPrice ? <span className="ml-2 font-bold ">${totalPrice.toFixed(2)}</span> : ""}
-          </div>
-          {cartItems.length > 0 && (
-            <button
-              onClick={handleCheckout}
-              className="bg-purple-500 text-white px-4 py-1 rounded mt-4"
-            >
-              {isCheckingOut ? "CheckingOut..." : "CheckOut"}
-            </button>
-          )}
-        </div>
-      </Modal>
+      <CartModal
+        show={showModal}
+        onClose={closeModal}
+        cartItems={cartItems}
+        totalPrice={totalPrice}
+        onRemove={removeFromCart}
+        onCheckout={handleCheckout}
+        checkoutLabel={isCheckingOut ? "CheckingOut..." : "CheckOut"}
+      />
     </>
   );
 }
