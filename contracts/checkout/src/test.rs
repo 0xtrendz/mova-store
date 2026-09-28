@@ -915,3 +915,24 @@ fn test_read_paths_extend_ttl_without_a_write() {
     assert_eq!(admin_after, LEDGER_TO_EXTEND_TO);
     assert_eq!(order_after, LEDGER_TO_EXTEND_TO);
 }
+
+#[test]
+fn test_reads_on_uninitialized_contract() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract = env.register(Checkout, ());
+    let client = CheckoutClient::new(&env, &contract);
+    let id = order_id(&env, 31);
+
+    // `merchant()` is the first call an operator makes after deploying, so it
+    // must surface NotInitialized on a fresh contract instead of panicking or
+    // handing back a default address.
+    let result = client.try_merchant();
+    assert_eq!(result, Err(Ok(Error::NotInitialized)));
+
+    // The order-scoped reads document their empty state too.
+    assert_eq!(client.order(&id), None);
+    assert_eq!(client.status(&id), None);
+    assert!(!client.is_paid(&id));
+}
