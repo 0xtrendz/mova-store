@@ -19,9 +19,26 @@ describe("Footer component", () => {
     expect(aboutLink).toBeInTheDocument();
     expect(aboutLink).toHaveAttribute("href", "/about");
 
-    const contactLink = screen.getByRole("link", { name: /24\/7 customer service/i });
+    const contactLink = screen.getByRole("link", { name: /contact us/i });
     expect(contactLink).toBeInTheDocument();
     expect(contactLink).toHaveAttribute("href", "/contact");
+  });
+
+  it("keeps the legal links rendered below the sm breakpoint", () => {
+    render(<Footer />);
+
+    const termsLink = screen.getByRole("link", { name: /terms of use/i });
+    const privacyLink = screen.getByRole("link", { name: /privacy policy/i });
+
+    // The historical bug was a `hidden ... sm:flex` container: it removed Terms
+    // and Privacy from layout on phones. The container must not carry `hidden`
+    // and must lay out with `flex` at every width.
+    const container = termsLink.closest("span");
+    expect(container).not.toBeNull();
+    expect(container).not.toHaveClass("hidden");
+    expect(container?.className).toContain("flex");
+    expect(container?.className).not.toContain("hidden");
+    expect(privacyLink.closest("span")).toBe(container);
   });
 
   it("fixes ungrammatical 'Term of use' wording", () => {
