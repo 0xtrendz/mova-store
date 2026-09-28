@@ -797,3 +797,42 @@ fn test_set_merchant_requires_admin_auth() {
     // The escrow destination is unchanged after the rejected call.
     assert_eq!(client.merchant(), merchant);
 }
+
+#[test]
+fn test_pay_with_a_different_token_than_create_order() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let token_a = env.register(MockToken, ());
+    let token_b = env.register(MockToken, ());
+    let contract = env.register(Checkout, ());
+    let merchant = Address::generate(&env);
+    let buyer = Address::generate(&env);
+
+    let client = CheckoutClient::new(&env, &contract);
+    client.initialize(&merchant);
+    client.add_token(&token_a);
+    client.add_token(&token_b);
+    MockTokenClient::new(&env, &token_a).mint(&buyer, &1_000_000);
+    MockTokenClient::new(&env, &token_b).mint(&buyer, &1_000_000);
+
+    let id = order_id(&env, 32);
+    client.create_order(&buyer, &id, &token_a, &50_000);
+    assert_eq!(client.order(&id).unwrap().token, token_a);
+
+    // `pay` settles with the whitelisted token presented in the call, so the
+    // registered intent is overwritten with the payment that actually happened.
+    client.pay(&token_b, &buyer, &id, &50_000);
+
+    let order = client.order(&id).unwrap();
+    assert_eq!(order.token, token_b);
+    assert_eq!(order.amount, 50_000);
+    assert_eq!(order.status, Status::Paid);
+    assert!(client.is_paid(&id));
+
+    // Nothing was ever moved in the token named by `create_order`.
+    assert_eq!(usdc_balance(&env, &token_a, &buyer), 1_000_000);
+    assert_eq!(usdc_balance(&env, &token_a, &contract), 0);
+    assert_eq!(usdc_balance(&env, &token_b, &buyer), 950_000);
+    assert_eq!(usdc_balance(&env, &token_b, &contract), 50_000);
+}
