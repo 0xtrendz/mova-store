@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { deleteProduct } from "../../lib/products";
 import { useProducts } from "../../hooks/useProducts";
 import AddProductForm from "./AddProductForm";
@@ -12,6 +12,11 @@ import { MdInventory } from "react-icons/md";
 const ProductsAdminContent = () => {
   const { products, error } = useProducts();
   const [selectedProductId, setSelectedProductId] = useState(null);
+  // Product ids whose delete request is in flight. Kept as state so the row is
+  // hidden optimistically (a stale refresh cannot resurrect it) and as a ref so
+  // a double-click is de-duplicated synchronously.
+  const [pendingDeletes, setPendingDeletes] = useState([]);
+  const inFlightDeletes = useRef(new Set());
 
   useEffect(() => {
     if (error) {
@@ -28,14 +33,31 @@ const ProductsAdminContent = () => {
   };
 
   const handleDelete = async (id) => {
+    // A delete that is already in flight for this id must not be issued twice;
+    // the ref is read synchronously so a rapid double-click cannot race it.
+    if (inFlightDeletes.current.has(id)) return;
+    inFlightDeletes.current.add(id);
+
+    // Functional update: the pending set is derived from its previous value, so
+    // it cannot be clobbered by an interleaved add/refresh render.
+    setPendingDeletes((prev) => (prev.includes(id) ? prev : [...prev, id]));
+
     try {
       // deleteProduct invalidates the shared cache, so the hook above
       // refetches the list with the row removed.
       await deleteProduct(id);
     } catch (error) {
       console.error("Error deleting product: ", error);
+    } finally {
+      inFlightDeletes.current.delete(id);
+      setPendingDeletes((prev) => prev.filter((pendingId) => pendingId !== id));
     }
   };
+
+  // Hide rows whose delete is in flight, even if a concurrent refetch returns
+  // them before the delete has settled. The next successful refetch omits them
+  // from the server list for good.
+  const visibleProducts = products.filter((product) => !pendingDeletes.includes(product.id));
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -74,7 +96,7 @@ const ProductsAdminContent = () => {
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => (
+              {visibleProducts.map((product) => (
                 <tr key={product.id} className="border-b hover:bg-gray-50">
                   <td className="py-4 px-6 text-gray-800">{product.name}</td>
                   <td className="py-4 px-6 text-gray-800">${Number(product.price).toFixed(2)}</td>
@@ -97,7 +119,8 @@ const ProductsAdminContent = () => {
                     <button
                       type="button"
                       aria-label={`Delete ${product.name}`}
-                      className="text-red-600 hover:text-red-800 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 rounded px-1"
+                      disabled={pendingDeletes.includes(product.id)}
+                      className="text-red-600 hover:text-red-800 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 rounded px-1 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleDelete(product.id)}
                     >
                       Delete
