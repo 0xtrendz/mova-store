@@ -8,6 +8,9 @@
    - Set `NEXT_PUBLIC_ADMIN_EMAILS` to your email (e.g. `NEXT_PUBLIC_ADMIN_EMAILS=admin@example.com`). Multiple emails can be comma-separated.
    - `AuthContext` reads this variable via `isAdminEmail` (`lib/env.ts`), and `components/AdminGuard.jsx` uses it to gate all `/admin` routes. If left unset, `isAdmin` defaults to `false` and authenticated users will be blocked with an "Access Denied" error when attempting to reach the admin catalog panel.
 4. In the SQL editor, run [`schema.sql`](./schema.sql).
+   - It must run top-to-bottom without error. To confirm the script actually reached the end, check that RLS is enabled on `products`:
+     `select relrowsecurity from pg_class where relname = 'products';` → expected `true`.
+     An empty result or `false` means the script aborted part-way and the `orders` table and policies were never created.
 5. Auth → Providers: enable **Email** (and **Google** if you want OAuth).
 6. Auth → URL Configuration: add `http://localhost:3000/**` (and your production URL).
 7. Restart `npm run dev`.
@@ -39,3 +42,19 @@ Consequences to be aware of when changing the checkout flow:
 - **`total`** is still guarded by the column's `total >= 0` check, and the
   authoritative amount is the value paid to the checkout contract, not the value in
   the request body.
+## admin_users: read access
+
+`public.admin_users` is the privileged allowlist that `public.is_admin()` reads.
+It is **not** world-readable and it is **not** readable by ordinary authenticated
+users:
+
+```sql
+create policy "Admins can view admin_users"
+  on public.admin_users for select
+  to authenticated
+  using (public.is_admin());
+```
+
+`public.is_admin()` is `security definer` and owned by the table owner, so it can
+still read `admin_users` internally without recursing through this policy, and
+admin-gated policies on `products`, `orders` and storage keep working.

@@ -82,7 +82,7 @@ timestamp, status }` and transitions `Pending → Paid → Shipped/Refunded`.
   - [Step 5b — Whitelist the tokens you accept](#step-5b--whitelist-the-tokens-you-accept)
   - [Step 6 — Wire the deployed contract to the storefront](#step-6--wire-the-deployed-contract-to-the-storefront)
   - [Convenience script](#convenience-script)
-- [Paying with USDC (testnet)](#paying-with-usdc-testnet)
+- [Paying with Stellar (testnet)](#paying-with-stellar-testnet)
 - [Environment Variables Reference](#environment-variables-reference)
 - [Security Notes](#security-notes)
 - [Contributing](#contributing)
@@ -182,33 +182,31 @@ mova-store/
 │   ├── admin/                      #   admin product management
 │   └── profile/login/              #   authentication
 ├── components/                     # Shared UI (Stellar checkout/wallet buttons, Toast…)
+├── context/                        # React context providers (CartContext)
+├── hooks/                          # Custom React hooks (useToast)
 ├── lib/                            # Client-side libraries
-│   ├── stellar/                    #   Soroban payment library
-│   │   ├── config.ts               #     network / contract / token config
-│   │   ├── freighter.ts            #     wallet connect / signing
-│   │   ├── scval.ts                #     ScVal builders + decoders
-│   │   ├── checkout.ts             #     payWithStellar() payment flow
-│   │   ├── account.ts              #     trustline / balance / friendbot
-│   │   ├── simulate.ts             #     pre-flight resource-fee simulation
-│   │   ├── indexer.ts              #     getEvents cursor listener
-│   │   └── events.ts               #     contract event decoding
-│   └── AuthContext.jsx             #   auth + cart context
+│   ├── AuthContext.js              #   auth context provider
+│   └── stellar/                    #   Soroban payment library
+│       ├── config.ts               #     network / contract / token config
+│       ├── freighter.ts            #     wallet connect / signing
+│       ├── scval.ts                #     ScVal builders + decoders
+│       ├── checkout.ts             #     payWithStellar() payment flow
+│       ├── account.ts              #     trustline / balance / friendbot
+│       ├── simulate.ts             #     pre-flight resource-fee simulation
+│       ├── indexer.ts              #     getEvents cursor listener
+│       └── events.ts               #     contract event decoding
 ├── contracts/
 │   └── checkout/                   # Contracts — Rust Soroban smart contract
-│       ├── src/
-│       │   ├── lib.rs              #   entry points (initialize, pay, dispatch, refund…)
-│       │   ├── order.rs            #   Order struct + status lifecycle
-│       │   ├── storage.rs          #   persistent storage + TTL management
-│       │   ├── events.rs           #   PaymentReceived / OrderShipped / OrderRefunded…
-│       │   ├── errors.rs           #   typed error codes
-│       │   └── test.rs             #   mock-token + native-asset integration tests
+│       ├── src/                    #   entry points + storage/events/errors
 │       ├── Cargo.toml
 │       └── README.md               #   contract interface + manual CLI examples
-├── docs/
-│   └── ARCHITECTURE.md             # Deep Stellar integration design rationale
-├── scripts/
-│   └── deploy-testnet.sh           # one-command build + deploy + initialize
-├── public/                         # Static assets (product images)
+├── docs/                           # Architecture, deployment and troubleshooting guides
+├── scripts/                        # deploy-testnet.sh — build + deploy + initialize
+├── public/                         # Static assets (product images, brand)
+├── styles/                         # Global Tailwind CSS (global.css)
+├── supabase/                       # schema.sql, seed.sql + setup notes
+├── tests/                          # Vitest suites (app, components, context, hooks, lib)
+├── __tests__/                      # Legacy Vitest suites (env, errors, events, products, scval)
 ├── .env.local.example              # Config — environment variable template
 ├── package.json                    # Frontend dependencies + scripts
 └── LICENSE
@@ -269,7 +267,6 @@ Copy the template and fill in your values:
 cp .env.local.example .env.local
 ```
 
-A minimal Stellar-only configuration (the rest of the app runs with the existing
 A minimal Stellar-only configuration (fill Supabase values for auth/catalog):
 
 ```bash

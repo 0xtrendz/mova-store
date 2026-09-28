@@ -5,6 +5,12 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  # Lets a maintainer run this workflow on any branch in this repository. That is
+  # how pull requests opened from forks get verified: GitHub gates their own runs
+  # behind an approval step, so the branch is mirrored into this repository and
+  # dispatched here instead. Without this, a fork pull request can sit with no CI
+  # result at all.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,10 +18,6 @@ concurrency:
 
 permissions:
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   NODE_VERSION: "20"
@@ -41,11 +43,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Order matters: a step that fails skips every step after it. Formatting is
+      # therefore reported last on purpose, so a repo-wide style drift cannot hide
+      # the results of the type check, the tests and the build.
       - name: Run ESLint
         run: npm run lint
-
-      - name: Check code formatting
-        run: npm run format:check
 
       - name: Type check
         run: npm run type-check
@@ -67,6 +69,10 @@ jobs:
           NEXT_PUBLIC_EMAILJS_SERVICE_ID: service_dummy
           NEXT_PUBLIC_EMAILJS_TEMPLATE_ID: template_dummy
           NEXT_PUBLIC_EMAILJS_PUBLIC_KEY: dummy_key
+
+      # Reported last: see the note above the ESLint step.
+      - name: Check code formatting
+        run: npm run format:check
 
   # Soroban contract checks
   contracts:
