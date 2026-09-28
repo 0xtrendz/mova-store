@@ -269,7 +269,12 @@ const Checkout = () => {
       });
   }, []);
 
-  const isEmptyCart = isLoaded && (cartItems.length === 0 || totalPrice <= 0);
+  // Emptiness is about the cart, not the total. If the server-side total cannot
+  // be computed (the compute-total request failed), the cart still has items and
+  // the customer must see the form — showing "Your cart is empty" would hide a
+  // full cart behind a transient API error. The pay button is gated separately on
+  // `totalPrice <= 0`, so an unresolved total still cannot be paid.
+  const isEmptyCart = isLoaded && cartItems.length === 0;
 
   useEffect(() => {
     if (stage === 3) {
