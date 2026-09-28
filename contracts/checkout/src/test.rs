@@ -8,7 +8,7 @@ use soroban_sdk::{
 };
 
 use crate::errors::Error;
-use crate::order::Status;
+use crate::order::{Order, Status};
 use crate::storage::{DataKey, LEDGER_THRESHOLD, LEDGER_TO_EXTEND_TO};
 use crate::{Checkout, CheckoutClient};
 
@@ -714,4 +714,41 @@ fn test_refund_twice_rejected_and_balance_unchanged() {
     );
     assert_eq!(usdc_balance(&env, &token, &checkout), 0);
     assert_eq!(client.status(&id), Some(Status::Refunded));
+}
+
+#[test]
+fn test_order_storage_round_trip_preserves_every_field() {
+    use crate::storage::{get_order, set_order};
+
+    let env = Env::default();
+    let contract = env.register(Checkout, ());
+    let buyer = Address::generate(&env);
+    let token = env.register(MockToken, ());
+    let id = order_id(&env, 38);
+
+    let order = Order {
+        buyer: buyer.clone(),
+        amount: 123_456,
+        token: token.clone(),
+        timestamp: 1_700_000_000,
+        status: Status::Shipped,
+    };
+
+    env.as_contract(&contract, || {
+        assert_eq!(
+            get_order(&env, &id),
+            None,
+            "no order exists before the write"
+        );
+
+        set_order(&env, &id, &order);
+
+        let loaded = get_order(&env, &id).expect("the written order must read back");
+        assert_eq!(loaded, order, "the whole record must round-trip unchanged");
+        assert_eq!(loaded.buyer, buyer);
+        assert_eq!(loaded.amount, 123_456);
+        assert_eq!(loaded.token, token);
+        assert_eq!(loaded.timestamp, 1_700_000_000);
+        assert_eq!(loaded.status, Status::Shipped);
+    });
 }
