@@ -403,37 +403,41 @@ describe("lib/products data layer", () => {
       const mockEq = vi.fn().mockResolvedValue(deleteResult);
       const mockDelete = vi.fn().mockReturnValue({ eq: mockEq });
       mockFrom.mockReturnValue({ select: mockSelect, delete: mockDelete });
-      return { mockSelect, mockDelete, mockEq };
+      return { mockSelect, mockSelectEq, mockDelete, mockEq, mockDeleteEq: mockEq };
     };
 
+    const storedImageUrl =
+      "https://proj.supabase.co/storage/v1/object/public/products/catalog/shoe%20photo.jpg";
+
     it("deletes a product by id", async () => {
-      const { mockDelete, mockEq } = stubFrom(null);
+      const { mockSelect, mockSelectEq, mockDeleteEq } = stubFrom(storedImageUrl);
+      mockStorageFrom.remove.mockResolvedValue({ data: [], error: null });
 
       await deleteProduct("p-del");
 
-      expect(mocks.mockSelect).toHaveBeenCalledWith("img");
-      expect(mocks.mockSelectEq).toHaveBeenCalledWith("id", "p-del");
-      expect(mocks.mockDeleteEq).toHaveBeenCalledWith("id", "p-del");
+      expect(mockSelect).toHaveBeenCalledWith("img");
+      expect(mockSelectEq).toHaveBeenCalledWith("id", "p-del");
+      expect(mockDeleteEq).toHaveBeenCalledWith("id", "p-del");
       expect(mockStorageFrom.remove).toHaveBeenCalledWith(["catalog/shoe photo.jpg"]);
-      expect(mocks.mockDeleteEq.mock.invocationCallOrder[0]).toBeLessThan(
+      expect(mockDeleteEq.mock.invocationCallOrder[0]).toBeLessThan(
         mockStorageFrom.remove.mock.invocationCallOrder[0]
       );
     });
 
     it("still deletes the row when storage removal rejects", async () => {
-      const mocks = mockProductDeletion();
+      const { mockDeleteEq } = stubFrom(storedImageUrl);
       mockStorageFrom.remove.mockRejectedValue(new Error("Object not found"));
 
       await expect(deleteProduct("p-del")).resolves.toBeUndefined();
 
-      expect(mocks.mockDeleteEq).toHaveBeenCalledWith("id", "p-del");
+      expect(mockDeleteEq).toHaveBeenCalledWith("id", "p-del");
       expect(mockStorageFrom.remove).toHaveBeenCalledWith(["catalog/shoe photo.jpg"]);
     });
 
     it("throws error when delete fails", async () => {
       stubFrom(null, {
         data: null,
-        error: new Error("Object not found"),
+        error: new Error("Foreign key constraint violation"),
       });
 
       await expect(deleteProduct("p-del")).rejects.toThrow("Foreign key constraint violation");

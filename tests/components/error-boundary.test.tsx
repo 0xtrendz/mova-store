@@ -106,6 +106,19 @@ describe("ErrorBoundary", () => {
   });
 });
 
+  it("renders the development-only error details when NODE_ENV is development", () => {
+    // `NODE_ENV` resolves to "development" under Vitest (see vitest.config.ts),
+    // so the guarded <details> block has to be reachable and rendered.
+    render(
+      <ErrorBoundary>
+        <Boom />
+      </ErrorBoundary>
+    );
+
+    expect(screen.getByText(/error details \(development only\)/i)).toBeInTheDocument();
+  });
+});
+
 describe("SkipLink", () => {
   it("points at the main content landmark by default", () => {
     render(<SkipLink />);
