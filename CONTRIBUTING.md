@@ -15,6 +15,7 @@ easy to test, and consistent across the frontend and the Rust contract.
 
 ## Table of Contents
 
+- [Quickstart](#quickstart)
 - [How Milestones & Issues Work on GrantFox](#how-milestones--issues-work-on-grantfox)
 - [The 5-Step Contribution Pipeline](#the-5-step-contribution-pipeline)
 - [Code Formatting](#code-formatting)
@@ -22,6 +23,44 @@ easy to test, and consistent across the frontend and the Rust contract.
 - [Commit Message Style](#commit-message-style)
 - [Pull Request Checklist](#pull-request-checklist)
 - [Code of Conduct](#code-of-conduct)
+
+---
+
+## Quickstart
+
+Prerequisites: Node 18.18+ (Node 20 is recommended; see `.nvmrc`) and npm. The
+Rust toolchain is only needed if you change `contracts/checkout`.
+
+```bash
+git clone https://github.com/Movalabs-crew/mova-store.git
+cd mova-store
+npm install
+
+# Copy the environment template and fill in the required keys.
+cp .env.local.example .env.local
+
+npm run dev          # storefront on http://localhost:3000
+```
+
+`npm run dev` starts the Next.js storefront. Until you deploy the checkout
+contract and set `NEXT_PUBLIC_CHECKOUT_CONTRACT_ID`, the on-chain checkout stays
+disabled; the catalog, cart and contact form still work. The full variable list
+lives in the [README](README.md#environment-variables-reference).
+
+Run the checks a pull request is expected to pass before you push:
+
+```bash
+npm run lint         # ESLint (next lint)
+npm run type-check   # tsc --noEmit
+npm run test         # Vitest, single pass
+npm run build        # production build
+```
+
+If your change touches the Rust contract, also run:
+
+```bash
+cd contracts/checkout && cargo test
+```
 
 ---
 
@@ -72,13 +111,13 @@ git checkout -b docs/stellar-contract-readme # documentation
 
 Branch naming conventions:
 
-| Prefix   | Use for                              | Example                         |
-| -------- | ------------------------------------ | ------------------------------- |
-| `feat/`  | New features                         | `feat/payment-retry`            |
-| `fix/`   | Bug fixes                            | `fix/wrong-total-on-mobile`     |
-| `docs/`  | Documentation only                   | `docs/soroban-deploy-guide`     |
-| `refactor/` | Code changes with no behavior change | `refactor/stellar-lib-modules`  |
-| `test/`  | Adding or updating tests             | `test/pay-dup-order-cases`      |
+| Prefix      | Use for                              | Example                        |
+| ----------- | ------------------------------------ | ------------------------------ |
+| `feat/`     | New features                         | `feat/payment-retry`           |
+| `fix/`      | Bug fixes                            | `fix/wrong-total-on-mobile`    |
+| `docs/`     | Documentation only                   | `docs/soroban-deploy-guide`    |
+| `refactor/` | Code changes with no behavior change | `refactor/stellar-lib-modules` |
+| `test/`     | Adding or updating tests             | `test/pay-dup-order-cases`     |
 
 ### Step 4 — Write clean code with testing
 
@@ -115,7 +154,7 @@ code must be formatted before pushing.
 
 ### JavaScript / TypeScript (frontend)
 
-- **Prettier** for formatting (`npx prettier --write "app/**/*.{js,jsx,ts,tsx}" "lib/**/*.ts" "components/**/*.{js,jsx}"`).
+- **Prettier** via the repo script: `npm run format` (verify with `npm run format:check`).
 - **ESLint** via the Next.js lint script for correctness:
 
 ```bash
@@ -181,10 +220,18 @@ npm run test:ui
 **Test file locations:**
 - Unit tests: `tests/lib/` for library functions (for example `tests/lib/env.test.ts` and `tests/lib/validation.test.ts`)
 - Shared Vitest setup: `tests/setup.ts`
-- Tests should be named `*.test.ts` or `*.test.tsx`
+- Tests must be named `<kebab-case-stem>.test.ts` or `<kebab-case-stem>.test.tsx`,
+  where the stem is the kebab-case name of the module under test. Dotted
+  qualifiers are allowed for a second concern in the same module, for example
+  `tests/context/cart-context.hydration.test.tsx`.
+- `.js` / `.jsx` test files are not allowed, and two test files in the same
+  directory may not share a stem (case-insensitively) — that is the case-only
+  collision that caused the mix-ups this convention replaces.
+- The rule is enforced in CI and locally with `npm run test:naming`.
 - Put new component tests under `tests/` only when you add them; do not assume a `tests/components/` directory exists yet
 
 **What to test:**
+
 - Utility functions (validation, formatting, etc.)
 - Custom hooks
 - Component behavior (user interactions, state changes)
@@ -215,6 +262,30 @@ npm run lint         # ESLint checks
 npm run build        # Production build must succeed
 ```
 
+### Local verification (`npm run verify`)
+
+`npm run verify` runs the same checks as CI, in the same order, so a
+contributor can reproduce a green (or red) build locally before pushing:
+
+```bash
+npm run verify
+```
+
+It expands to:
+
+1. `npm run lint` — ESLint
+2. `npm run type-check` — `tsc --noEmit`
+3. `npm run test` — Vitest, single run
+4. `npm run test:coverage` — Vitest with the coverage thresholds
+5. `npm run build` — production Next.js build
+6. `npm run format:check` — Prettier drift report
+
+The build step reads the `NEXT_PUBLIC_*` variables, so copy
+`.env.local.example` to `.env.local` (or export the values) before running
+`verify`; CI injects throwaway values into `npm run build` for the same reason.
+Formatting is checked last on purpose, exactly as in CI, so repo-wide style
+drift cannot hide a failing type check, test, or build.
+
 ### Manual QA for Payment Changes
 
 If your PR touches the Stellar payment flow, describe in the PR how you tested
@@ -230,14 +301,14 @@ tooling detect releases automatically.
 <type>(<optional scope>): <short summary>
 ```
 
-| Type       | Meaning                                  |
-| ---------- | ---------------------------------------- |
-| `feat`     | A new user-facing feature                |
-| `fix`      | A bug fix                                |
-| `docs`     | Documentation only                       |
-| `refactor` | Code change with no behavior change      |
-| `test`     | Adding or updating tests                 |
-| `chore`    | Build tooling, deps, config              |
+| Type       | Meaning                             |
+| ---------- | ----------------------------------- |
+| `feat`     | A new user-facing feature           |
+| `fix`      | A bug fix                           |
+| `docs`     | Documentation only                  |
+| `refactor` | Code change with no behavior change |
+| `test`     | Adding or updating tests            |
+| `chore`    | Build tooling, deps, config         |
 
 Examples:
 
@@ -252,7 +323,7 @@ chore: bump @stellar/stellar-sdk to 16.2.0
 Rules:
 
 - Imperative mood, lowercase after the type, no trailing period.
-- Summary under ~72 characters. Add a body explaining *why* when it's not
+- Summary under ~72 characters. Add a body explaining _why_ when it's not
   obvious.
 - One logical change per commit. Prefer several focused commits over one large
   one.
@@ -269,6 +340,7 @@ Before opening a PR, verify:
 - [ ] Frontend tests pass (`npm run test`).
 - [ ] Contract tests pass (`cd contracts/checkout && cargo test`).
 - [ ] Build succeeds (`npm run build`).
+- [ ] Combined local check passes (`npm run verify`)
 - [ ] New behavior has tests; existing tests updated where needed.
 - [ ] No secrets, `.env` files, or build artifacts in the diff.
 - [ ] README/docs updated if behavior or config changed.
@@ -281,7 +353,7 @@ everyone — regardless of experience, background, or identity.
 **Our expectations:**
 
 - **Be respectful.** Disagreement on code is normal; keep it about the code.
-- **Be constructive.** In reviews, explain *why*; in replies, be open to
+- **Be constructive.** In reviews, explain _why_; in replies, be open to
   alternatives.
 - **Be patient.** Maintainers and contributors volunteer their time; reviews may
   take a few days.
@@ -297,4 +369,4 @@ reviewed confidentially.
 
 ---
 
-*Happy building — and see you on GrantFox.*
+_Happy building — and see you on GrantFox._
