@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Frontend dependencies. `next`, `eslint-config-next` and the `@next/*`
+  # packages must move together: eslint-config-next depends on
+  # @next/eslint-plugin-next at its own exact version, so bumping one without
+  # the others desynchronises the lint rules from the framework version.
+  # Grouping them keeps every bump atomic (see CONTRIBUTING.md).
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      nextjs-toolchain:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+          - "@next/*"
+          - "eslint-plugin-next"

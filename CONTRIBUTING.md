@@ -19,6 +19,7 @@ easy to test, and consistent across the frontend and the Rust contract.
 - [The 5-Step Contribution Pipeline](#the-5-step-contribution-pipeline)
 - [Code Formatting](#code-formatting)
 - [Testing Guidelines](#testing-guidelines)
+- [Dependency Management](#dependency-management)
 - [Commit Message Style](#commit-message-style)
 - [Pull Request Checklist](#pull-request-checklist)
 - [Code of Conduct](#code-of-conduct)
@@ -220,6 +221,28 @@ npm run build        # Production build must succeed
 If your PR touches the Stellar payment flow, describe in the PR how you tested
 it against testnet (Freighter + USDC faucet account). Follow the flow in the
 root [README](README.md#paying-with-stellar-testnet).
+
+## Dependency Management
+
+Some packages are tightly coupled and must be bumped together:
+
+- **`next` and `eslint-config-next`** are pinned to the same version.
+  `eslint-config-next` depends on `@next/eslint-plugin-next` at that exact
+  version, so bumping `next` without `eslint-config-next` (or vice versa)
+  silently desynchronises the lint rules from the framework version.
+- **`@next/*` packages** track the `next` version.
+
+Bump them as one unit:
+
+- Dependabot (`.github/dependabot.yml`) is configured to open a single grouped
+  PR for `next`, `eslint-config-next`, `@next/*` and `eslint-plugin-next`.
+  Merge that group as one change.
+- For a manual bump, set **both** entries in `package.json` to the same
+  version, run `npm install` so `package-lock.json` is regenerated, and commit
+  all three files together.
+
+CI fails when the two `package.json` entries drift, so a half-finished bump
+cannot land unnoticed.
 
 ## Commit Message Style
 
