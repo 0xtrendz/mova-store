@@ -144,11 +144,24 @@ The card payment form fields are UI-only placeholders. In production:
 
 ### Supabase Row Level Security
 
-Apply `supabase/schema.sql` so that:
+Apply `supabase/schema.sql`. The shipped policies are already the hardened,
+admin-only model — there is no outstanding "tighten later" step:
 
-- Anyone can read products
-- Only authenticated users can write products / upload images
-- Tighten policies further for production (admin-only writes)
+- **Products** — `public.products` and the `products` storage bucket are publicly
+  readable; `insert`, `update` and `delete` on both require `public.is_admin()`
+  (`"Admins can insert/update/delete products"`,
+  `"Admins can upload/update/delete product images"`).
+- **Orders** — buyers may read only their own rows
+  (`auth.uid() = user_id or auth.email() = user_email`); status changes and
+  deletions are admin-only.
+- **Allowlist** — `public.admin_users`, which backs `public.is_admin()`, is
+  readable by admins only.
+
+`public.is_admin()` (defined next to the `admin_users` table in
+`supabase/schema.sql`) is the single source of truth for admin access: it returns
+true when the caller's JWT carries `app_metadata.is_admin = true`, or when the
+caller's email is in `public.admin_users`. Grant admin rights through one of those
+two mechanisms; never widen a policy to work around a missing admin entry.
 
 Never expose the Supabase **service role** key in the browser.
 
