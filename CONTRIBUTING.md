@@ -215,6 +215,30 @@ npm run lint         # ESLint checks
 npm run build        # Production build must succeed
 ```
 
+### Local verification (`npm run verify`)
+
+`npm run verify` runs the same checks as CI, in the same order, so a
+contributor can reproduce a green (or red) build locally before pushing:
+
+```bash
+npm run verify
+```
+
+It expands to:
+
+1. `npm run lint` — ESLint
+2. `npm run type-check` — `tsc --noEmit`
+3. `npm run test` — Vitest, single run
+4. `npm run test:coverage` — Vitest with the coverage thresholds
+5. `npm run build` — production Next.js build
+6. `npm run format:check` — Prettier drift report
+
+The build step reads the `NEXT_PUBLIC_*` variables, so copy
+`.env.local.example` to `.env.local` (or export the values) before running
+`verify`; CI injects throwaway values into `npm run build` for the same reason.
+Formatting is checked last on purpose, exactly as in CI, so repo-wide style
+drift cannot hide a failing type check, test, or build.
+
 ### Manual QA for Payment Changes
 
 If your PR touches the Stellar payment flow, describe in the PR how you tested
@@ -269,6 +293,7 @@ Before opening a PR, verify:
 - [ ] Frontend tests pass (`npm run test`).
 - [ ] Contract tests pass (`cd contracts/checkout && cargo test`).
 - [ ] Build succeeds (`npm run build`).
+- [ ] Combined local check passes (`npm run verify`)
 - [ ] New behavior has tests; existing tests updated where needed.
 - [ ] No secrets, `.env` files, or build artifacts in the diff.
 - [ ] README/docs updated if behavior or config changed.

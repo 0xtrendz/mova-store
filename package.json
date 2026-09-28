@@ -30,6 +30,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
+    "verify": "npm run lint && npm run type-check && npm run test && npm run test:coverage && npm run build && npm run format:check",
     "deploy:testnet": "./scripts/deploy-testnet.sh",
     "prepare": "echo 'Mova Store ready!'"
   },
