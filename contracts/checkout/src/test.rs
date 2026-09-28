@@ -752,3 +752,28 @@ fn test_order_storage_round_trip_preserves_every_field() {
         assert_eq!(loaded.status, Status::Shipped);
     });
 }
+
+#[test]
+fn test_dispatch_twice_releases_escrow_once() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token, merchant, buyer, checkout) = setup_usdc(&env);
+    let id = order_id(&env, 18);
+    client.pay(&token, &buyer, &id, &100_000);
+
+    // First dispatch releases the escrow to the merchant.
+    client.dispatch(&id);
+    assert_eq!(usdc_balance(&env, &token, &checkout), 0);
+    assert_eq!(usdc_balance(&env, &token, &merchant), 100_000);
+    assert_eq!(client.status(&id), Some(Status::Shipped));
+
+    // A second dispatch must be rejected and must not move the escrow again.
+    let result = client.try_dispatch(&id);
+    assert_eq!(result, Err(Ok(Error::InvalidOrderStatus)));
+
+    assert_eq!(usdc_balance(&env, &token, &checkout), 0);
+    assert_eq!(usdc_balance(&env, &token, &merchant), 100_000);
+    assert_eq!(usdc_balance(&env, &token, &buyer), 900_000);
+    assert_eq!(client.status(&id), Some(Status::Shipped));
+}
