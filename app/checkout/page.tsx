@@ -24,7 +24,13 @@ import sendMail from "../../lib/sendmail";
 import StellarCheckoutButton from "../../components/StellarCheckoutButton";
 import StellarWalletButton from "../../components/StellarWalletButton";
 import StellarOrderWatch from "../../components/StellarOrderWatch";
-import { SUPPORTED_TOKENS, defaultToken, TokenConfig, NETWORK } from "../../lib/stellar/config";
+import { SiStellar } from "react-icons/si";
+import {
+  SUPPORTED_TOKENS,
+  defaultToken,
+  TokenConfig,
+  NETWORK,
+} from "../../lib/stellar/config";
 import { convertUsdToXlm, DEFAULT_XLM_USD_PRICE } from "../../lib/stellar/price";
 import {
   validateOTP,
@@ -138,20 +144,52 @@ const Checkout = () => {
   };
 
   useEffect(() => {
+    // Read the cart items from localStorage (IDs only; we re-fetch prices
+    // server-side so a tampered localStorage.totalPrice has no effect).
+    let storedItems: any[] = [];
     try {
-      const storedItems = JSON.parse(localStorage.getItem("cartItems") || "[]");
-      const storedTotalPrice = localStorage.getItem("totalPrice");
-      if (Array.isArray(storedItems)) {
-        setCartItems(storedItems);
-      }
-      if (storedTotalPrice) {
-        setTotalPrice(parseFloat(storedTotalPrice));
+      const raw = localStorage.getItem("cartItems");
+      const parsed = JSON.parse(raw || "[]");
+      if (Array.isArray(parsed)) {
+        storedItems = parsed;
       }
     } catch {
-      setCartItems([]);
-    } finally {
-      setIsLoaded(true);
+      storedItems = [];
     }
+
+    setCartItems(storedItems);
+
+    if (storedItems.length === 0) {
+      setIsLoaded(true);
+      return;
+    }
+
+    // Ask the server to compute the authoritative total from current DB prices.
+    const itemRefs = storedItems.map((item: any) => ({
+      id: item.id,
+      quantity: item.quantity ?? 1,
+    }));
+
+    fetch("/api/checkout/compute-total", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: itemRefs }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`compute-total: HTTP ${res.status}`);
+        return res.json() as Promise<{ total: number }>;
+      })
+      .then(({ total }) => {
+        setTotalPrice(total);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch server-side total:", err);
+        // Keep totalPrice at 0 so the cart is treated as unresolvable.
+        setTotalPrice(0);
+      })
+      .finally(() => {
+        setIsLoaded(true);
+      });
   }, []);
 
   const isEmptyCart = isLoaded && (cartItems.length === 0 || totalPrice <= 0);
