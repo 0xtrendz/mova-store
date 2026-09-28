@@ -209,10 +209,7 @@ export async function fetchBuyerOrders(userEmailOrId?: string): Promise<BuyerOrd
   try {
     if (supabase && userEmailOrId) {
       const isEmail = userEmailOrId.includes("@");
-      const query = supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const query = supabase.from("orders").select("*").order("created_at", { ascending: false });
 
       const res = isEmail
         ? await query.eq("user_email", userEmailOrId)
@@ -240,19 +237,16 @@ export async function fetchBuyerOrders(userEmailOrId?: string): Promise<BuyerOrd
     console.warn("Supabase query failed, falling back to cached orders:", err);
   }
 
-  // Fallback to localStorage cached orders
+  // Fallback to localStorage cached orders. The cache is shared by every account
+  // that has ever used this browser, so matching is strict: an order is only
+  // surfaced when the identifier matches exactly, and a caller without an
+  // identifier only ever sees the anonymous (guest) entries.
   if (orders.length === 0) {
     const cached = getCachedBuyerOrders();
     if (userEmailOrId) {
-      orders = cached.filter(
-        (o) =>
-          !o.userEmail ||
-          !o.userId ||
-          o.userEmail === userEmailOrId ||
-          o.userId === userEmailOrId
-      );
+      orders = cached.filter((o) => o.userEmail === userEmailOrId || o.userId === userEmailOrId);
     } else {
-      orders = cached;
+      orders = cached.filter((o) => !o.userEmail && !o.userId);
     }
   }
 
