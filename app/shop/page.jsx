@@ -61,9 +61,9 @@ export default function Products() {
       <div className="w-full max-w-screen-xl mx-auto py-8">
         <Cart itemCount={itemCount} onClick={openModal} />
         <section className="h-[70vh] overflow-auto">
-          <span className="font-display text-4xl sm:text-6xl py-4 flex justify-center items-center font-extrabold text-mova-ink">
+          <h1 className="font-display text-4xl sm:text-6xl py-4 flex justify-center items-center font-extrabold text-mova-ink">
             Welcome to Mova Store
-          </span>
+          </h1>
 
           {error && <p className="text-red-500 text-center">{error}</p>}
 
@@ -81,8 +81,8 @@ export default function Products() {
                       height={200}
                       className="mb-2"
                     />
-                    <h1 className="text-xl font-bold">{prod.name}</h1>
-                    <h2 className="text-lg">${prod.price}</h2>
+                    <h2 className="text-xl font-bold">{prod.name}</h2>
+                    <p className="text-lg">${prod.price}</p>
                   </Link>
                   <button
                     className="border-purple-800 rounded-full px-2 py-2 mt-2 border-2 hover:border-purple-600"
