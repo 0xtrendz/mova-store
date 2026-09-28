@@ -1,5 +1,13 @@
 "use client";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 const CartContext = createContext();
 
@@ -66,7 +74,7 @@ export const CartProvider = ({ children }) => {
     setTotalPrice(storedTotalPrice);
   }, []);
 
-  const addToCart = (product) => {
+  const addToCart = useCallback((product) => {
     if (!isHydratedRef.current) {
       const stored = readStoredCart();
       const updatedCartItems = [...stored.storedCartItems, product];
@@ -108,9 +116,9 @@ export const CartProvider = ({ children }) => {
       localStorage.setItem("totalPrice", newTotalPrice.toString());
       return newTotalPrice;
     });
-  };
+  }, []);
 
-  const removeFromCart = (product) => {
+  const removeFromCart = useCallback((product) => {
     if (!isHydratedRef.current) {
       const stored = readStoredCart();
       const index = stored.storedCartItems.findIndex((item) => item.id === product?.id);
@@ -169,9 +177,9 @@ export const CartProvider = ({ children }) => {
       localStorage.setItem("totalPrice", newPrice.toString());
       return newPrice;
     });
-  };
+  }, [cartItems]);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCartItems([]);
     setItemCount(0);
     setTotalPrice(0);
@@ -180,21 +188,27 @@ export const CartProvider = ({ children }) => {
       localStorage.removeItem("itemCount");
       localStorage.removeItem("totalPrice");
     } catch {}
-  };
+  }, []);
+
+  // One referentially stable value per cart state (Issue #633): without this the
+  // inline object literal is recreated on every provider render, so every
+  // consumer re-renders even when the cart itself has not changed.
+  const contextValue = useMemo(
+    () => ({
+      cartItems,
+      itemCount,
+      totalPrice,
+      hydrated,
+      isHydrated: hydrated,
+      addToCart,
+      removeFromCart,
+      clearCart,
+    }),
+    [cartItems, itemCount, totalPrice, hydrated, addToCart, removeFromCart, clearCart]
+  );
 
   return (
-    <CartContext.Provider
-      value={{
-        cartItems,
-        itemCount,
-        totalPrice,
-        hydrated,
-        isHydrated: hydrated,
-        addToCart,
-        removeFromCart,
-        clearCart,
-      }}
-    >
+    <CartContext.Provider value={contextValue}>
       {children}
     </CartContext.Provider>
   );
