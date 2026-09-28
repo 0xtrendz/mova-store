@@ -35,12 +35,26 @@ export default defineConfig({
     exclude: ["node_modules", "contracts", ".next", "out"],
     coverage: {
       provider: "v8",
+      // Count every file in the source tree, not only the modules a test
+      // happens to import. Without this the denominator is whatever the test
+      // files touch, so untested modules can never drag coverage down.
+      all: true,
+      include: [
+        "app/**/*.{js,jsx,ts,tsx}",
+        "components/**/*.{js,jsx,ts,tsx}",
+        "lib/**/*.{js,jsx,ts,tsx}",
+        "context/**/*.{js,jsx,ts,tsx}",
+        "hooks/**/*.{js,jsx,ts,tsx}",
+      ],
       reporter: ["text", "json", "html"],
       thresholds: {
-        lines: 4,
-        statements: 4,
-        functions: 10,
-        branches: 40,
+        // Floor taken from the measured suite on this branch
+        // (61.25% lines/statements, 60.8% functions, 77.83% branches), so the
+        // gate is comfortably met today and any real regression fails it.
+        lines: 60,
+        statements: 60,
+        functions: 60,
+        branches: 70,
       },
       exclude: [
         "node_modules/",
