@@ -6,6 +6,9 @@ import {
   getNativeBalance,
   isAccountMissingError,
 } from "../../../lib/stellar/account";
+import { FRIENDBOT_URL } from "../../../lib/stellar/config";
+import { WalletError } from "../../../lib/stellar/freighter";
+import { parseError } from "../../../lib/errors";
 
 describe("formatAmount", () => {
   it("formats MIN_NATIVE_RESERVE with 7 decimals correctly", () => {
@@ -107,6 +110,114 @@ describe("loadAccount", () => {
     expect(result.funded).toBe(true);
     expect(result.account).toBe(dummyAccount);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // Friendbot is asked for this exact public key (URL-encoded)…
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `${FRIENDBOT_URL}?addr=${encodeURIComponent(dummyPublicKey)}`
+    );
+    // …exactly once, and it runs between the failed lookup and the re-load:
+    // a second getAccount without funding would just miss again.
+    expect(stubServer.getAccount).toHaveBeenCalledTimes(2);
+    expect(stubServer.getAccount).toHaveBeenNthCalledWith(1, dummyPublicKey);
+    expect(stubServer.getAccount).toHaveBeenNthCalledWith(2, dummyPublicKey);
+    expect(fetchSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      stubServer.getAccount.mock.invocationCallOrder[1]
+    );
+
+    fetchSpy.mockRestore();
+  });
+
+  it("never funds an account that already exists", async () => {
+    const dummyAccount = { id: dummyPublicKey, sequence: "7" };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+    } as Response);
+
+    const stubServer = { getAccount: vi.fn().mockResolvedValue(dummyAccount) };
+
+    const result = await loadAccount(stubServer as never, dummyPublicKey, { fund: true });
+
+    expect(result).toEqual({ account: dummyAccount, funded: false });
+    expect(stubServer.getAccount).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    fetchSpy.mockRestore();
+  });
+
+  it("skips friendbot and throws ACCOUNT_NOT_FOUND when fund is false", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+    } as Response);
+
+    const stubServer = {
+      getAccount: vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error("Account not found"), { status: 404 })),
+    };
+
+    await expect(
+      loadAccount(stubServer as never, dummyPublicKey, { fund: false })
+    ).rejects.toMatchObject({
+      name: "WalletError",
+      code: "ACCOUNT_NOT_FOUND",
+      message: expect.stringContaining("Fund it with XLM before paying"),
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(stubServer.getAccount).toHaveBeenCalledTimes(1);
+
+    fetchSpy.mockRestore();
+  });
+
+  it("surfaces an HTTP failure from friendbot as FRIENDBOT_ERROR and never re-loads", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 400,
+    } as Response);
+
+    const stubServer = {
+      getAccount: vi.fn().mockRejectedValue(new Error("Account not found (404)")),
+    };
+
+    const err = await loadAccount(stubServer as never, dummyPublicKey, { fund: true }).catch(
+      (e) => e
+    );
+
+    expect(err).toBeInstanceOf(WalletError);
+    expect(err).toMatchObject({ code: "FRIENDBOT_ERROR" });
+    expect(err.message).toBe("Could not fund testnet account (friendbot HTTP 400).");
+    // The funding attempt failed, so the account is never re-loaded a second time.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(stubServer.getAccount).toHaveBeenCalledTimes(1);
+    // And the failure maps to the user-facing friendbot error, not a generic one.
+    expect(parseError(err)).toMatchObject({
+      code: "FRIENDBOT_FUNDING_FAILED",
+      userMessage: expect.stringContaining("Friendbot"),
+      action: "Retry",
+    });
+
+    fetchSpy.mockRestore();
+  });
+
+  it("surfaces a friendbot network failure as FRIENDBOT_ERROR instead of a raw fetch error", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+
+    const stubServer = {
+      getAccount: vi.fn().mockRejectedValue(new Error("Account not found (404)")),
+    };
+
+    const err = await loadAccount(stubServer as never, dummyPublicKey, { fund: true }).catch(
+      (e) => e
+    );
+
+    expect(err).toBeInstanceOf(WalletError);
+    expect(err).toMatchObject({ code: "FRIENDBOT_ERROR" });
+    expect(err.message).toBe(
+      "Could not fund testnet account (friendbot unreachable: fetch failed)."
+    );
+    expect(stubServer.getAccount).toHaveBeenCalledTimes(1);
+    expect(parseError(err).code).toBe("FRIENDBOT_FUNDING_FAILED");
 
     fetchSpy.mockRestore();
   });
