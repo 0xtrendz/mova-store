@@ -10,6 +10,7 @@ import {
   hexToBytes,
   bytesToHex,
   hashOrderId,
+  resolveOrderIdHash,
 } from "../../../lib/stellar/scval";
 
 describe("ScVal helpers", () => {
@@ -68,33 +69,19 @@ describe("ScVal helpers", () => {
       expect(() => bytes32ToScVal("aabbcc")).toThrow("order_id must be exactly 32 bytes");
     });
 
-    it("produces byte-identical XDR for hexString and uint8ArrayOfSameBytes", () => {
-      const hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-      const bytes = hexToBytes(hex);
-      const scValFromHex = bytes32ToScVal(hex);
-      const scValFromBytes = bytes32ToScVal(bytes);
-
     it("accepts a case-insensitive 0x prefix and an empty string", () => {
       expect(bytesToHex(hexToBytes("0Xa1B2c3"))).toBe("a1b2c3");
       expect(hexToBytes("")).toEqual(new Uint8Array());
     });
 
     it("rejects non-hex characters and identifies the offending input", () => {
-      expect(() => hexToBytes("gggg")).toThrow(
-        'invalid hex character "g" at index 0'
-      );
-      expect(() => hexToBytes("0xzz")).toThrow(
-        'invalid hex character "z" at index 0'
-      );
-      expect(() => hexToBytes("00x0")).toThrow(
-        'invalid hex character "x" at index 2'
-      );
+      expect(() => hexToBytes("gggg")).toThrow('invalid hex character "g" at index 0');
+      expect(() => hexToBytes("0xzz")).toThrow('invalid hex character "z" at index 0');
+      expect(() => hexToBytes("00x0")).toThrow('invalid hex character "x" at index 2');
     });
 
     it("prevents invalid 32-byte hex from reaching bytes32ToScVal", () => {
-      expect(() => bytes32ToScVal("g".repeat(64))).toThrow(
-        'invalid hex character "g" at index 0'
-      );
+      expect(() => bytes32ToScVal("g".repeat(64))).toThrow('invalid hex character "g" at index 0');
     });
 
     it("throws on odd-length hex strings", () => {
@@ -128,8 +115,7 @@ describe("ScVal helpers", () => {
   });
 
   it("passes through a 64-hex string unchanged as bytes", async () => {
-    const hexId =
-      "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2";
+    const hexId = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2";
     const result = await resolveOrderIdHash(hexId);
     expect(result).toBeInstanceOf(Uint8Array);
     expect(result.length).toBe(32);
@@ -139,11 +125,10 @@ describe("ScVal helpers", () => {
     expect(Array.from(result)).not.toEqual(Array.from(hashed));
   });
 
-    it("decodes bytes to hex string", () => {
-      const bytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
-      const scVal = xdr.ScVal.scvBytes(bytes);
-      expect(scValToString(scVal)).toBe("deadbeef");
-    });
+  it("decodes bytes to hex string", () => {
+    const bytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+    const scVal = xdr.ScVal.scvBytes(bytes);
+    expect(scValToString(scVal)).toBe("deadbeef");
   });
 
   it("falls back to hashing for inputs shorter than 64 hex chars", async () => {
@@ -153,4 +138,3 @@ describe("ScVal helpers", () => {
     expect(Array.from(result)).toEqual(Array.from(expected));
   });
 });
-
