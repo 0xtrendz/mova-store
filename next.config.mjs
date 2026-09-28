@@ -82,6 +82,8 @@ const nextConfig = {
   },
 
   experimental: {
+    // Required for Next.js 14 to load the root `instrumentation.ts` hook.
+    instrumentationHook: true,
     optimizePackageImports: [
       "react-icons",
       "@stellar/stellar-sdk",
