@@ -128,6 +128,24 @@ npm run lint
 npx tsc --noEmit
 ```
 
+### Git hooks (installed automatically)
+
+The root `prepare` script installs a `pre-commit` hook, so the formatting and
+lint checks above run on exactly the files you are committing:
+
+```bash
+npm install          # installs the hook via `prepare`
+git commit -m "..."  # formats and lints the staged files first
+```
+
+`scripts/pre-commit-checks.mjs` runs Prettier and ESLint (`--fix`) over the
+staged files, re-stages anything it rewrites, and aborts the commit when ESLint
+still reports errors. The hook is not committed: it lives in
+`.git/hooks/pre-commit`, and `scripts/setup-git-hooks.mjs` (re)installs it on
+every `npm install` from the root `prepare` script. Both scripts are no-ops
+outside a git checkout (CI, tarballs). Use `git commit --no-verify` to bypass
+the hook for a single commit.
+
 ### Rust (contract)
 
 - **rustfmt** for formatting:

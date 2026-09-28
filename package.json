@@ -31,7 +31,7 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "deploy:testnet": "./scripts/deploy-testnet.sh",
-    "prepare": "echo 'Mova Store ready!'"
+    "prepare": "node scripts/setup-git-hooks.mjs"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
