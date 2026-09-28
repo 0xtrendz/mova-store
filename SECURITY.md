@@ -134,21 +134,44 @@ The current OTP implementation generates codes client-side for demonstration pur
 - Implement rate limiting on OTP requests
 - Add OTP expiration (recommended: 5 minutes)
 
-### Card Payment Fields
+### Card Payment Fields (threat model)
 
-The card payment form fields are UI-only placeholders. In production:
+The card number, expiry and CVV fields on `/checkout` are a **UI-only demo
+affordance**. No card data may be transmitted, persisted or processed by this
+application:
 
-- Integrate with a PCI-compliant payment processor (Stripe, etc.)
-- Never handle raw card data on your servers
-- Use tokenization for card storage
+- Card values live only in React state for the lifetime of the tab. They are never
+  sent to an API, logged, written to `localStorage`, placed in a URL, or handed to
+  a third party.
+- Because no card value leaves the browser, Mova Store stays outside PCI DSS scope
+  for cardholder data.
+- The UI labels the fields as demo-only so a shopper cannot mistake them for a real
+  payment form; the sanctioned path is the Stellar (Soroban) checkout.
+
+Do not "finish" this form in place. If real card payments are ever required,
+integrate a PCI-compliant processor (Stripe, etc.) and let it collect card data in
+its own iframe/tokenization flow — never handle raw card data on our servers.
 
 ### Supabase Row Level Security
 
-Apply `supabase/schema.sql` so that:
+Apply `supabase/schema.sql`. The shipped policies are already the hardened,
+admin-only model — there is no outstanding "tighten later" step:
 
-- Anyone can read products
-- Only authenticated users can write products / upload images
-- Tighten policies further for production (admin-only writes)
+- **Products** — `public.products` and the `products` storage bucket are publicly
+  readable; `insert`, `update` and `delete` on both require `public.is_admin()`
+  (`"Admins can insert/update/delete products"`,
+  `"Admins can upload/update/delete product images"`).
+- **Orders** — buyers may read only their own rows
+  (`auth.uid() = user_id or auth.email() = user_email`); status changes and
+  deletions are admin-only.
+- **Allowlist** — `public.admin_users`, which backs `public.is_admin()`, is
+  readable by admins only.
+
+`public.is_admin()` (defined next to the `admin_users` table in
+`supabase/schema.sql`) is the single source of truth for admin access: it returns
+true when the caller's JWT carries `app_metadata.is_admin = true`, or when the
+caller's email is in `public.admin_users`. Grant admin rights through one of those
+two mechanisms; never widen a policy to work around a missing admin entry.
 
 Never expose the Supabase **service role** key in the browser.
 

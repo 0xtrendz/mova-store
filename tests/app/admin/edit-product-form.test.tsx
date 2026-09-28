@@ -177,6 +177,30 @@ describe("EditProductForm status banners reset and error styling (#27)", () => {
     });
   });
 
+  it("announces the save confirmation as a status message (#600)", async () => {
+    const product = {
+      id: "prod-1",
+      name: "Echo Hoodie",
+      price: 75,
+      img: "https://example.com/echo.jpg",
+    };
+    mockGetProductById.mockResolvedValue(product);
+    mockUpdateProduct.mockResolvedValue({});
+
+    render(<EditProductForm productId="prod-1" onProductUpdated={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Echo Hoodie")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /update product/i }));
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Product updated successfully!");
+    // The success banner must remain a polite status region, never an alert.
+    expect(status).toHaveAttribute("aria-live", "polite");
+  });
+
   it("uploads product image if a new image file is selected", async () => {
     const product = {
       id: "prod-1",
