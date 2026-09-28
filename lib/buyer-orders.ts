@@ -200,6 +200,22 @@ export function getCachedBuyerOrders(): BuyerOrder[] {
 }
 
 /**
+ * Removes every cached buyer order from localStorage.
+ *
+ * Sign-out must not leave a previous buyer's order history behind on a shared
+ * browser: `getCachedBuyerOrders()` is a public read used by the orders pages,
+ * so the entries have to be dropped rather than only filtered per caller.
+ */
+export function clearCachedBuyerOrders(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (err) {
+    console.warn("Failed to clear cached buyer orders:", err);
+  }
+}
+
+/**
  * Fetches past orders for an authenticated user.
  */
 export async function fetchBuyerOrders(userEmailOrId?: string): Promise<BuyerOrder[]> {
