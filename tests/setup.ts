@@ -1,7 +1,14 @@
 import "@testing-library/jest-dom";
-import { vi } from "vitest";
+import { beforeEach, vi } from "vitest";
 import React from "react";
 import { webcrypto } from "node:crypto";
+import { resetProductCache } from "../lib/productCache";
+
+// The product list cache is module-level state; wipe it between tests so a
+// cached read from one test can never satisfy (or skip) another test's fetch.
+beforeEach(() => {
+  resetProductCache();
+});
 
 // Mock Next.js router
 vi.mock("next/navigation", () => ({
@@ -31,17 +38,15 @@ Object.defineProperty(globalThis, "crypto", {
   writable: true,
 });
 
-// Ensure Node Buffer is recognized as Uint8Array across JSDOM realm boundaries
-const originalHasInstance = Uint8Array[Symbol.hasInstance];
-Object.defineProperty(Uint8Array, Symbol.hasInstance, {
-  value: (inst: unknown) => {
-    return (
-      (originalHasInstance ? originalHasInstance.call(Uint8Array, inst) : inst instanceof Uint8Array) ||
-      Buffer.isBuffer(inst)
-    );
-  },
-  configurable: true,
-});
+// NOTE: do not reintroduce a `Uint8Array[Symbol.hasInstance]` override here.
+//
+// An earlier revision installed one so that Node `Buffer`s would also satisfy
+// `value instanceof Uint8Array` across the JSDOM realm boundary. That override is
+// not safe to install globally: it makes the `Buffer.from(x)` coercion inside
+// `@stellar/js-xdr`'s `XdrWriter.write` take the "already a Uint8Array, nothing to
+// convert" path, so the raw value is written with `value.copy(...)` and every
+// `bytes32ToScVal(...).toXDR()` throws `TypeError: value.copy is not a function`.
+// JSDOM's `Uint8Array` and Node's `Buffer` interoperate correctly without it.
 
 // Mock environment variables
 vi.stubEnv("NEXT_PUBLIC_STELLAR_NETWORK", "testnet");
