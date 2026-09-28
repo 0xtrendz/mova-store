@@ -1,4 +1,4 @@
-import { StrKey, xdr, Address } from "@stellar/stellar-sdk";
+import { StrKey, xdr, Address, rpc } from "@stellar/stellar-sdk";
 import { describe, expect, it, vi } from "vitest";
 
 const { CONTRACT_ID, CONTRACT_ID_STR } = vi.hoisted(() => {
