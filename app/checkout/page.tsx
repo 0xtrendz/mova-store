@@ -228,6 +228,14 @@ const Checkout = () => {
             {stage === 1 && (
               <form onSubmit={handleSubmit} className="bg-white p-4 rounded shadow-md">
                 <h2 className="text-2xl mb-4 text-center">Checkout</h2>
+                <p
+                  role="note"
+                  className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                >
+                  Demo checkout — the card fields below are placeholders. Card values are
+                  never transmitted or stored. Use the Stellar payment option to place a
+                  real order.
+                </p>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div className="mb-4">
                     <label htmlFor="checkout-first-name" className="block text-gray-700">First Name</label>
@@ -284,6 +292,7 @@ const Checkout = () => {
                         id="checkout-card-number"
                         type="text"
                         name="cardNumber"
+                        autoComplete="off"
                         value={formData.cardNumber}
                         onChange={(e) => {
                           let { value } = e.target;
@@ -314,6 +323,7 @@ const Checkout = () => {
                         id="checkout-expiry-date"
                         type="text"
                         name="expiryDate"
+                        autoComplete="off"
                         value={formData.expiryDate}
                         onChange={(e) => {
                           let { value } = e.target;
@@ -352,6 +362,7 @@ const Checkout = () => {
                         id="checkout-cvv"
                         type="text"
                         name="cvv"
+                        autoComplete="off"
                         value={formData.cvv}
                         onChange={(e) => {
                           let { value } = e.target;
