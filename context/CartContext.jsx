@@ -5,6 +5,51 @@ const CartContext = createContext();
 
 export const useCart = () => useContext(CartContext);
 
+/**
+ * Create a stable, unique identifier for a single cart line.
+ *
+ * `crypto.randomUUID()` is used when available (browsers on a secure context,
+ * Node >= 16.7 via webcrypto). The fallback keeps the cart usable in older
+ * runtimes without silently falling back to array indexes.
+ */
+export const createCartItemId = () => {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // fall through to the deterministic-ish fallback below
+  }
+
+  return `cart-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+/**
+ * Give every cart line a unique `cartItemId`.
+ *
+ * Lines already carrying an id are returned untouched so re-hydrating an
+ * already-normalised cart does not churn identities (keys must stay stable
+ * across re-renders). Legacy lines persisted before line identities existed
+ * are upgraded in place.
+ */
+export const ensureCartItemIds = (items) => {
+  if (!Array.isArray(items)) {
+    return { items: [], changed: false };
+  }
+
+  let changed = false;
+  const nextItems = items.map((item) => {
+    if (item && typeof item === "object" && item.cartItemId) {
+      return item;
+    }
+
+    changed = true;
+    return { ...(item || {}), cartItemId: createCartItemId() };
+  });
+
+  return { items: nextItems, changed };
+};
+
 export const readStoredCart = () => {
   let storedCartItems = [];
   let storedItemCount = 0;
@@ -61,114 +106,112 @@ export const CartProvider = ({ children }) => {
     setHydrated(true);
     const { storedCartItems, storedItemCount, storedTotalPrice } = readStoredCart();
 
-    setCartItems(storedCartItems);
+    // Upgrade legacy rows (persisted before line identities existed) so every
+    // line has a unique id, and persist the normalised form once.
+    const { items: hydratedCartItems, changed } = ensureCartItemIds(storedCartItems);
+    if (changed) {
+      try {
+        localStorage.setItem("cartItems", JSON.stringify(hydratedCartItems));
+      } catch {}
+    }
+
+    setCartItems(hydratedCartItems);
     setItemCount(storedItemCount);
     setTotalPrice(storedTotalPrice);
   }, []);
 
   const addToCart = (product) => {
-    if (!isHydratedRef.current) {
-      const stored = readStoredCart();
-      const updatedCartItems = [...stored.storedCartItems, product];
-      const newItemCount = stored.storedItemCount + 1;
-      const newTotalPrice = stored.storedTotalPrice + (product?.price || 0);
-
-      try {
-        localStorage.setItem("cartItems", JSON.stringify(updatedCartItems));
-        localStorage.setItem("itemCount", newItemCount.toString());
-        localStorage.setItem("totalPrice", newTotalPrice.toString());
-      } catch {}
-
-      setCartItems(updatedCartItems);
-      setItemCount(newItemCount);
-      setTotalPrice(newTotalPrice);
-      return;
-    }
+    // Each call adds a *new line*, even for a product already in the cart, so
+    // the line gets its own identity rather than reusing the product id.
+    const cartLine = { ...(product || {}), cartItemId: createCartItemId() };
 
     setCartItems((prevCartItems) => {
-      const merged = isHydratedRef.current
-        ? [...prevCartItems, product]
-        : [...JSON.parse(localStorage.getItem("cartItems") || "[]"), product];
-      localStorage.setItem("cartItems", JSON.stringify(merged));
+      const base = isHydratedRef.current
+        ? prevCartItems
+        : readStoredCart().storedCartItems;
+      const merged = [...base, cartLine];
+      try {
+        localStorage.setItem("cartItems", JSON.stringify(merged));
+      } catch {}
       return merged;
     });
 
     setItemCount((prevItemCount) => {
       const newItemCount = isHydratedRef.current
         ? prevItemCount + 1
-        : (JSON.parse(localStorage.getItem("itemCount") || "0") || 0) + 1;
-      localStorage.setItem("itemCount", newItemCount.toString());
+        : readStoredCart().storedItemCount + 1;
+      try {
+        localStorage.setItem("itemCount", newItemCount.toString());
+      } catch {}
       return newItemCount;
     });
 
     setTotalPrice((prevTotalPrice) => {
       const newTotalPrice = isHydratedRef.current
-        ? prevTotalPrice + product.price
-        : (parseFloat(localStorage.getItem("totalPrice") || "0") || 0) + product.price;
-      localStorage.setItem("totalPrice", newTotalPrice.toString());
+        ? prevTotalPrice + (product?.price || 0)
+        : readStoredCart().storedTotalPrice + (product?.price || 0);
+      try {
+        localStorage.setItem("totalPrice", newTotalPrice.toString());
+      } catch {}
       return newTotalPrice;
     });
   };
 
-  const removeFromCart = (product) => {
-    if (!isHydratedRef.current) {
-      const stored = readStoredCart();
-      const index = stored.storedCartItems.findIndex((item) => item.id === product?.id);
-      if (index === -1) return;
+  /**
+   * Remove a single cart line.
+   *
+   * `target` may be the line object itself or a `cartItemId` string. Lines are
+   * matched by `cartItemId` when one is supplied so that duplicate products are
+   * removed by identity instead of by array position (or by the shared product
+   * id, which would always drop the first duplicate).
+   */
+  const removeFromCart = (target) => {
+    const targetCartItemId =
+      typeof target === "string" ? target : target?.cartItemId || null;
+    const targetProductId =
+      typeof target === "object" && target !== null ? target.id : null;
 
-      const removedItem = stored.storedCartItems[index];
-      const updatedCartItems = [...stored.storedCartItems];
-      updatedCartItems.splice(index, 1);
-      const newItemCount = Math.max(0, stored.storedItemCount - 1);
-      const newTotalPrice = Math.max(0, stored.storedTotalPrice - (removedItem.price || 0));
+    const matchesLine = (item) => {
+      if (!item) return false;
+      if (targetCartItemId) {
+        return item.cartItemId === targetCartItemId;
+      }
+      // Legacy callers pass a bare product without a line id: fall back to the
+      // product id (first match) exactly as before.
+      return item.id === targetProductId;
+    };
 
-      try {
-        localStorage.setItem("cartItems", JSON.stringify(updatedCartItems));
-        localStorage.setItem("itemCount", newItemCount.toString());
-        localStorage.setItem("totalPrice", newTotalPrice.toString());
-      } catch {}
+    const stored = isHydratedRef.current ? null : readStoredCart();
+    const source = isHydratedRef.current
+      ? cartItems
+      : stored.storedCartItems;
+    const currentItemCount = isHydratedRef.current
+      ? itemCount
+      : stored.storedItemCount;
+    const currentTotalPrice = isHydratedRef.current
+      ? totalPrice
+      : stored.storedTotalPrice;
 
-      setCartItems(updatedCartItems);
-      setItemCount(newItemCount);
-      setTotalPrice(newTotalPrice);
-      return;
-    }
+    const index = source.findIndex(matchesLine);
+    if (index === -1) return;
 
-    setCartItems((prevCartItems) => {
-      const merged = isHydratedRef.current
-        ? [...prevCartItems]
-        : [...JSON.parse(localStorage.getItem("cartItems") || "[]")];
-      const index = merged.findIndex((item) => item.id === product.id);
-      if (index === -1) return merged;
+    const removedItem = source[index];
+    const nextCartItems = [...source];
+    nextCartItems.splice(index, 1);
 
-      merged.splice(index, 1);
-      localStorage.setItem("cartItems", JSON.stringify(merged));
-      return merged;
-    });
+    const removedPrice = removedItem?.price || 0;
+    const nextItemCount = Math.max(0, currentItemCount - 1);
+    const nextTotalPrice = Math.max(0, currentTotalPrice - removedPrice);
 
-    setItemCount((prevItemCount) => {
-      const newCount = isHydratedRef.current
-        ? prevItemCount - 1
-        : Math.max(0, (JSON.parse(localStorage.getItem("itemCount") || "0") || 0) - 1);
-      localStorage.setItem("itemCount", newCount.toString());
-      return newCount;
-    });
+    setCartItems(nextCartItems);
+    setItemCount(nextItemCount);
+    setTotalPrice(nextTotalPrice);
 
-    setTotalPrice((prevTotalPrice) => {
-      const items = isHydratedRef.current
-        ? cartItems
-        : JSON.parse(localStorage.getItem("cartItems") || "[]");
-      const removedItem = items.find((item) => item.id === product.id);
-      if (!removedItem) return prevTotalPrice;
-      const newPrice = isHydratedRef.current
-        ? prevTotalPrice - removedItem.price
-        : Math.max(
-            0,
-            (parseFloat(localStorage.getItem("totalPrice") || "0") || 0) - removedItem.price
-          );
-      localStorage.setItem("totalPrice", newPrice.toString());
-      return newPrice;
-    });
+    try {
+      localStorage.setItem("cartItems", JSON.stringify(nextCartItems));
+      localStorage.setItem("itemCount", nextItemCount.toString());
+      localStorage.setItem("totalPrice", nextTotalPrice.toString());
+    } catch {}
   };
 
   const clearCart = () => {
