@@ -104,7 +104,6 @@ describe("ErrorBoundary", () => {
     expect(screen.getByText("recovered")).toBeInTheDocument();
     expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
   });
-});
 
   it("renders the development-only error details when NODE_ENV is development", () => {
     // `NODE_ENV` resolves to "development" under Vitest (see vitest.config.ts),

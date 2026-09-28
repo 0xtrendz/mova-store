@@ -24,7 +24,6 @@ import sendMail from "../../lib/sendmail";
 import StellarCheckoutButton from "../../components/StellarCheckoutButton";
 import StellarWalletButton from "../../components/StellarWalletButton";
 import StellarOrderWatch from "../../components/StellarOrderWatch";
-import { SiStellar } from "react-icons/si";
 import {
   SUPPORTED_TOKENS,
   defaultToken,
