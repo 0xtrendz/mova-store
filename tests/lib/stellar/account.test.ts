@@ -48,6 +48,40 @@ describe("formatAmount", () => {
     const expected = expectedFrac ? `${expectedInt}.${expectedFrac}` : expectedInt;
     expect(formatted).toBe(expected);
   });
+
+  it("preserves exact precision above 2^53 (Number.MAX_SAFE_INTEGER boundary) where Number() loses precision", () => {
+    // 2^53 + 1 = 9007199254740993n. In IEEE-754 double, Number(9007199254740993n) rounds down to 9007199254740992.
+    const aboveSafe = 9007199254740993n;
+    expect(formatAmount(aboveSafe, 0)).toBe("9007199254740993");
+    expect(formatAmount(aboveSafe, 7)).toBe("900719925.4740993");
+    expect(formatAmount(-aboveSafe, 7)).toBe("-900719925.4740993");
+
+    // 2^53 + 3 = 9007199254740995n
+    const aboveSafe2 = 9007199254740995n;
+    expect(formatAmount(aboveSafe2, 7)).toBe("900719925.4740995");
+  });
+
+  it("formats exact values across each decimal boundary for numbers above 2^53", () => {
+    const raw = 9007199254740993n;
+    expect(formatAmount(raw, 0)).toBe("9007199254740993");
+    expect(formatAmount(raw, 1)).toBe("900719925474099.3");
+    expect(formatAmount(raw, 2)).toBe("90071992547409.93");
+    expect(formatAmount(raw, 4)).toBe("900719925474.0993");
+    expect(formatAmount(raw, 7)).toBe("900719925.4740993");
+    expect(formatAmount(raw, 15)).toBe("9.007199254740993");
+    expect(formatAmount(raw, 16)).toBe("0.9007199254740993");
+    expect(formatAmount(raw, 18)).toBe("0.009007199254740993");
+  });
+
+  it("formats large Stellar i128 boundary amounts accurately without precision degradation", () => {
+    const I128_MAX = (1n << 127n) - 1n; // 170141183460469231731687303715884105727n
+    const I128_MIN = -(1n << 127n); // -170141183460469231731687303715884105728n
+
+    expect(formatAmount(I128_MAX, 7)).toBe("17014118346046923173168730371588.4105727");
+    expect(formatAmount(I128_MIN, 7)).toBe("-17014118346046923173168730371588.4105728");
+    expect(formatAmount(I128_MAX, 0)).toBe("170141183460469231731687303715884105727");
+    expect(formatAmount(I128_MIN, 0)).toBe("-170141183460469231731687303715884105728");
+  });
 });
 
 describe("isAccountMissingError", () => {
