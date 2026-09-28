@@ -125,11 +125,30 @@ export const CartProvider = ({ children }) => {
     // the line gets its own identity rather than reusing the product id.
     const cartLine = { ...(product || {}), cartItemId: createCartItemId() };
 
+    if (!isHydratedRef.current) {
+      // Pre-hydration: read once, then compute and persist all three keys in a
+      // single pass. Splitting this into three independent updaters that each
+      // re-read localStorage lets one add see a half-written cart, so the item
+      // count and total drift out of step with the items.
+      const stored = readStoredCart();
+      const updatedCartItems = [...stored.storedCartItems, cartLine];
+      const newItemCount = stored.storedItemCount + 1;
+      const newTotalPrice = stored.storedTotalPrice + (product?.price || 0);
+
+      try {
+        localStorage.setItem("cartItems", JSON.stringify(updatedCartItems));
+        localStorage.setItem("itemCount", newItemCount.toString());
+        localStorage.setItem("totalPrice", newTotalPrice.toString());
+      } catch {}
+
+      setCartItems(updatedCartItems);
+      setItemCount(newItemCount);
+      setTotalPrice(newTotalPrice);
+      return;
+    }
+
     setCartItems((prevCartItems) => {
-      const base = isHydratedRef.current
-        ? prevCartItems
-        : readStoredCart().storedCartItems;
-      const merged = [...base, cartLine];
+      const merged = [...prevCartItems, cartLine];
       try {
         localStorage.setItem("cartItems", JSON.stringify(merged));
       } catch {}
@@ -137,9 +156,7 @@ export const CartProvider = ({ children }) => {
     });
 
     setItemCount((prevItemCount) => {
-      const newItemCount = isHydratedRef.current
-        ? prevItemCount + 1
-        : readStoredCart().storedItemCount + 1;
+      const newItemCount = prevItemCount + 1;
       try {
         localStorage.setItem("itemCount", newItemCount.toString());
       } catch {}
@@ -147,9 +164,7 @@ export const CartProvider = ({ children }) => {
     });
 
     setTotalPrice((prevTotalPrice) => {
-      const newTotalPrice = isHydratedRef.current
-        ? prevTotalPrice + (product?.price || 0)
-        : readStoredCart().storedTotalPrice + (product?.price || 0);
+      const newTotalPrice = prevTotalPrice + (product?.price || 0);
       try {
         localStorage.setItem("totalPrice", newTotalPrice.toString());
       } catch {}

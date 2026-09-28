@@ -22,8 +22,16 @@ function wrapper({ children }) {
   return <CartProvider>{children}</CartProvider>;
 }
 
+// `addToCart` gives every line its own `cartItemId` so duplicate products keep
+// distinct identities (see the remove / duplicate-row suites, which assert that
+// property directly). These cases are about counts, totals and persistence, so
+// the generated line id is normalised away rather than pinned to a literal.
+function withoutLineIds(cartItems) {
+  return cartItems.map(({ cartItemId, ...rest }) => rest);
+}
+
 function expectCartState(result, { items, count, total }) {
-  expect(result.current.cartItems).toEqual(items);
+  expect(withoutLineIds(result.current.cartItems)).toEqual(items);
   expect(result.current.itemCount).toBe(count);
   expect(result.current.totalPrice).toBe(total);
   expect(result.current.itemCount).toBeGreaterThanOrEqual(0);
@@ -37,7 +45,7 @@ function expectStored({ items, count, total, cleared = false }) {
     expect(localStorage.getItem("totalPrice")).toBeNull();
     return;
   }
-  expect(JSON.parse(localStorage.getItem("cartItems") || "[]")).toEqual(items);
+  expect(withoutLineIds(JSON.parse(localStorage.getItem("cartItems") || "[]"))).toEqual(items);
   expect(localStorage.getItem("itemCount")).toBe(String(count));
   expect(localStorage.getItem("totalPrice")).toBe(String(total));
   expect(Number(localStorage.getItem("itemCount"))).toBeGreaterThanOrEqual(0);
