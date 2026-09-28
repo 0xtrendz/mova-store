@@ -16,6 +16,7 @@ easy to test, and consistent across the frontend and the Rust contract.
 ## Table of Contents
 
 - [How Milestones & Issues Work on GrantFox](#how-milestones--issues-work-on-grantfox)
+- [Campaign Waves](#campaign-waves)
 - [The 5-Step Contribution Pipeline](#the-5-step-contribution-pipeline)
 - [Code Formatting](#code-formatting)
 - [Testing Guidelines](#testing-guidelines)
@@ -39,6 +40,28 @@ platform:
 A common misconception: bounty work is not "first to merge wins." It is
 **reviewed on quality**, so a well-tested, well-documented PR that satisfies the
 acceptance criteria wins over a faster, sloppier one.
+
+## Campaign Waves
+
+Some contribution campaigns are organized into numbered **waves**. A wave is a
+time-boxed group of issues that share a campaign label; the label identifies the
+issues included in that campaign and makes the current worklist easy to find.
+
+### Active campaign labels
+
+| Label | What it means |
+| ----- | ------------- |
+| `Stellar Wave` | An issue in the active Stellar Wave campaign. |
+
+To see the current Stellar Wave worklist, open the
+[open issues labeled `Stellar Wave`](https://github.com/Movalabs-crew/mova-store/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22Stellar%20Wave%22).
+When a later wave begins, its campaign label and worklist will be documented in
+this table.
+
+Only issues carrying the label for the campaign you are joining are part of
+that campaign. An issue with no campaign label, or one labeled for another
+wave, is not eligible for the current wave even if it is otherwise open. Check
+the issue's labels before applying for a related bounty or starting work.
 
 ## The 5-Step Contribution Pipeline
 
