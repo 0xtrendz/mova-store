@@ -52,10 +52,11 @@ jobs:
       - name: Type check
         run: npm run type-check
 
-      - name: Run tests
-        run: npm run test
-
-      - name: Run test coverage
+      # "vitest run --coverage" executes the whole suite once and collects v8
+      # coverage in the same pass, so a separate "npm run test" step would run
+      # every test a second time for no extra signal. The coverage thresholds in
+      # vitest.config.ts still gate this step.
+      - name: Run tests with coverage
         run: npm run test:coverage
 
       - name: Build Next.js
@@ -116,6 +117,7 @@ jobs:
       - name: Build contracts
         working-directory: contracts/checkout
         run: cargo build --release --target wasm32v1-none
+
 
       - name: Run contract tests
         working-directory: contracts/checkout
