@@ -39,7 +39,12 @@ export function bytes32ToScVal(bytes: Uint8Array | string): xdr.ScVal {
   if (arr.length !== 32) {
     throw new Error(`order_id must be exactly 32 bytes (got ${arr.length})`);
   }
-  return xdr.ScVal.scvBytes(arr as any);
+  // Pass a copy: `scvBytes` retains the reference it is handed, so without this a
+  // later mutation of the caller's array would silently change the built ScVal.
+  // NOTE: the `as any` widening cast here is deliberately left open-coded - issue
+  // #552 tracks centralizing it behind the `toSdkBytes` helper, so do not fold the
+  // two changes together.
+  return xdr.ScVal.scvBytes(arr.slice() as any);
 }
 
 /**
@@ -151,6 +156,21 @@ export async function hashOrderId(orderId: string): Promise<Uint8Array> {
 
 /**
  * True when `value` is already a 32-byte order id rendered as hex.
+ *
+ * POLICY (issue #542): the check is purely syntactic — any 64 hex characters,
+ * optionally `0x`-prefixed, mean "already hashed". The two possible inputs are
+ * indistinguishable, so an explicit contract is required:
+ *
+ *   - Raw (human) order ids must NEVER be 64 hex characters. The storefront
+ *     only mints `SS-<timestamp>-<random>` ids, which always contain `-` and
+ *     therefore can never match.
+ *   - Admin views hold indexer-derived ids that are exactly 64 hex and must
+ *     keep taking the passthrough path — hashing that hex again can never
+ *     reproduce the stored BytesN<32>.
+ *
+ * A raw id that violates the rule is sent to the contract unhashed and misses
+ * the stored order (OrderNotFound); it is not detectable after the fact.
+ * Documented in README.md, "Order id encoding".
  */
 export function isOrderIdHashHex(value: string): boolean {
   return /^(0[xX])?[0-9a-fA-F]{64}$/.test(value);
@@ -167,6 +187,9 @@ export function isOrderIdHashHex(value: string): boolean {
  *
  * A 64-hex id is therefore decoded straight to bytes and passed through
  * unchanged; anything else is treated as a pre-image and hashed.
+ *
+ * The rule is ambiguous by construction, so the policy (issue #542) is that
+ * raw ids are never 64 hex characters — see `isOrderIdHashHex` above.
  */
 export async function resolveOrderIdHash(orderId: string): Promise<Uint8Array> {
   return isOrderIdHashHex(orderId) ? hexToBytes(orderId) : hashOrderId(orderId);
