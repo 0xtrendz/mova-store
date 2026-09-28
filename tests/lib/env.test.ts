@@ -316,7 +316,7 @@ describe("loadStellarConfig", () => {
 
     expect(errors).toHaveLength(0);
     expect(config.network).toBe("mainnet");
-    expect(config.rpcUrl).toBe("https://soroban-rpc.mainnet.stellar.gateway.fm");
+    expect(config.rpcUrl).toBe("https://soroban-rpc.stellar.org");
     expect(config.networkPassphrase).toBe("Public Global Stellar Network ; September 2015");
   });
 
