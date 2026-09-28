@@ -18,6 +18,22 @@
 Products live in the `products` table; images in the public `products` storage bucket.
 
 
+## Orders: who may update or delete rows
+
+`public.orders` is a payments table, so its write surface is intentionally narrow:
+
+- `insert` — authenticated buyers create their own rows (see the insert policy in
+  `schema.sql`).
+- `update` / `delete` — **admin only**, granted explicitly through
+  `public.is_admin()` (`"Admins can update orders"`, `"Admins can delete orders"`).
+
+There is no permissive fallback: with RLS enabled and only those policies in place,
+an `update` or `delete` by an unauthenticated or non-admin caller is denied by
+default. A buyer's order status is authoritative once the Stellar payment has been
+verified, so admin flows are the only sanctioned way to change it.
+
+To grant admin rights, use the `public.admin_users` allowlist or the `is_admin`
+JWT claim (`app_metadata.is_admin`) as described in [`../SECURITY.md`](../SECURITY.md).
 ## Orders: who may insert rows
 
 Only an authenticated buyer may create an order row, and only for their own
