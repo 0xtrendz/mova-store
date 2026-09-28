@@ -37,13 +37,8 @@ create table if not exists public.admin_users (
 alter table public.admin_users enable row level security;
 
 drop policy if exists "Admins can view admin_users" on public.admin_users;
-create policy "Admins can view admin_users"
-  on public.admin_users for select
-  to authenticated
-  using (
-    lower((auth.jwt() ->> 'email')) = lower(email)
-    or coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false) = true
-  );
+-- The replacement policy is created after public.is_admin() is defined below,
+-- because a policy expression may only reference a function that already exists.
 
 -- Helper function: Evaluates true if the caller is an admin via JWT claims or admin_users table
 create or replace function public.is_admin()
@@ -59,6 +54,16 @@ as $$
       where lower(email) = lower(auth.jwt() ->> 'email')
     );
 $$;
+
+-- admin_users backs is_admin() and holds the privileged allowlist. Only admins
+-- may read it: anon and ordinary authenticated users get no rows, so the list of
+-- privileged addresses is not world-readable. is_admin() is SECURITY DEFINER and
+-- owned by the table owner, which bypasses RLS on this table, so evaluating the
+-- policy does not recurse.
+create policy "Admins can view admin_users"
+  on public.admin_users for select
+  to authenticated
+  using (public.is_admin());
 
 -- Products Row Level Security:
 -- Public can read products; only admins can insert, update, or delete products.

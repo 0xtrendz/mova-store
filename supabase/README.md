@@ -16,3 +16,21 @@
 7. Restart `npm run dev`.
 
 Products live in the `products` table; images in the public `products` storage bucket.
+
+
+## admin_users: read access
+
+`public.admin_users` is the privileged allowlist that `public.is_admin()` reads.
+It is **not** world-readable and it is **not** readable by ordinary authenticated
+users:
+
+```sql
+create policy "Admins can view admin_users"
+  on public.admin_users for select
+  to authenticated
+  using (public.is_admin());
+```
+
+`public.is_admin()` is `security definer` and owned by the table owner, so it can
+still read `admin_users` internally without recursing through this policy, and
+admin-gated policies on `products`, `orders` and storage keep working.
