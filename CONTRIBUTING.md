@@ -181,7 +181,14 @@ npm run test:ui
 **Test file locations:**
 - Unit tests: `tests/lib/` for library functions (for example `tests/lib/env.test.ts` and `tests/lib/validation.test.ts`)
 - Shared Vitest setup: `tests/setup.ts`
-- Tests should be named `*.test.ts` or `*.test.tsx`
+- Tests must be named `<kebab-case-stem>.test.ts` or `<kebab-case-stem>.test.tsx`,
+  where the stem is the kebab-case name of the module under test. Dotted
+  qualifiers are allowed for a second concern in the same module, for example
+  `tests/context/cart-context.hydration.test.tsx`.
+- `.js` / `.jsx` test files are not allowed, and two test files in the same
+  directory may not share a stem (case-insensitively) — that is the case-only
+  collision that caused the mix-ups this convention replaces.
+- The rule is enforced in CI and locally with `npm run test:naming`.
 - Put new component tests under `tests/` only when you add them; do not assume a `tests/components/` directory exists yet
 
 **What to test:**

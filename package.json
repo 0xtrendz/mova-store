@@ -30,6 +30,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
+    "test:naming": "node scripts/check-test-names.mjs",
     "deploy:testnet": "./scripts/deploy-testnet.sh",
     "prepare": "echo 'Mova Store ready!'"
   },

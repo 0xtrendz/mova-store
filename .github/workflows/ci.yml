@@ -75,6 +75,19 @@ jobs:
       - name: Check code formatting
         run: npm run format:check
 
+  # Test file naming convention
+  test-naming:
+    name: Test File Naming
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Enforce test file naming convention
+        run: node scripts/check-test-names.mjs
+
   # Soroban contract checks
   contracts:
     name: Soroban Contracts (Build, Test, Format, Clippy)
@@ -178,7 +191,7 @@ jobs:
   # Summary job that requires all checks to pass
   ci-success:
     name: CI Success
-    needs: [frontend, contracts, security, rust-security]
+    needs: [frontend, contracts, security, rust-security, test-naming]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
@@ -200,6 +213,10 @@ jobs:
           fi
           if [[ "${{ needs.rust-security.result }}" != "success" ]]; then
             echo "Rust security job failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test-naming.result }}" != "success" ]]; then
+            echo "Test naming job failed"
             exit 1
           fi
           echo "All required checks passed!"
