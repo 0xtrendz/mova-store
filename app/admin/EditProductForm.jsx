@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { getProductById, updateProduct, uploadProductImage } from "../../lib/products";
+import Image from "next/image";
 
 const EditProductForm = ({ productId, onProductUpdated }) => {
   const [productName, setProductName] = useState("");
@@ -122,9 +123,11 @@ const EditProductForm = ({ productId, onProductUpdated }) => {
             onChange={(e) => setProductImage(e.target.files[0])}
           />
           {existingImageUrl && (
-            <img
+            <Image
               src={existingImageUrl}
               alt={productName ? `${productName} current image` : "Current product image preview"}
+              width={400}
+              height={300}
               className="mt-4 max-w-full h-auto rounded-md"
             />
           )}
