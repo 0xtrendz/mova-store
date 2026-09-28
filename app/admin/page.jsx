@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { listProducts, deleteProduct } from "../../lib/products";
+import { deleteProduct } from "../../lib/products";
+import { useProducts } from "../../hooks/useProducts";
 import AddProductForm from "./AddProductForm";
 import EditProductForm from "./EditProductForm";
 import AdminGuard from "../../components/AdminGuard";
@@ -9,36 +10,28 @@ import { SiStellar } from "react-icons/si";
 import { MdInventory } from "react-icons/md";
 
 const ProductsAdminContent = () => {
-  const [products, setProducts] = useState([]);
+  const { products, error } = useProducts();
   const [selectedProductId, setSelectedProductId] = useState(null);
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
-    try {
-      const data = await listProducts();
-      setProducts(data);
-    } catch (error) {
+    if (error) {
       console.error("Error fetching products: ", error);
     }
-  };
+  }, [error]);
 
   const handleProductAdded = () => {
     setSelectedProductId(null);
-    fetchProducts();
   };
 
   const handleProductUpdated = () => {
     setSelectedProductId(null);
-    fetchProducts();
   };
 
   const handleDelete = async (id) => {
     try {
+      // deleteProduct invalidates the shared cache, so the hook above
+      // refetches the list with the row removed.
       await deleteProduct(id);
-      setProducts(products.filter((product) => product.id !== id));
     } catch (error) {
       console.error("Error deleting product: ", error);
     }

@@ -89,6 +89,21 @@ describe("Toast display and exit timers", () => {
   });
 });
 
+describe("Toast dismiss control accessibility (#594)", () => {
+  afterEach(() => cleanup());
+
+  it("exposes a programmatic name and hides the glyph from assistive tech", () => {
+    render(<Toast message="Saved" show={true} onClose={() => {}} />);
+
+    // The control is reachable by its accessible name, not by the "✕" symbol.
+    const dismiss = screen.getByRole("button", { name: "Dismiss notification" });
+    expect(dismiss).toBeTruthy();
+
+    // The visible glyph is decorative, so it must not be announced verbatim.
+    expect(screen.getByText("✕")).toHaveAttribute("aria-hidden", "true");
+  });
+});
+
 describe("Toast accessibility live region (Issue #593)", () => {
   afterEach(cleanup);
 

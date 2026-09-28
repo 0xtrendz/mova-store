@@ -70,6 +70,22 @@ describe("isProduction", () => {
   });
 });
 
+describe("NODE_ENV resolution", () => {
+  // The suite must see one value for `process.env.NODE_ENV`. If it is pinned by
+  // a build-time `define` while `test.env` declares something else, the
+  // development-only branches in `lib/env.ts` become unreachable.
+  it("resolves NODE_ENV at runtime to the value the test environment declares", () => {
+    vi.unstubAllEnvs();
+    expect(process.env.NODE_ENV).toBe("development");
+  });
+
+  it("makes the development branch of isDevelopment() reachable without stubbing", () => {
+    vi.unstubAllEnvs();
+    expect(isDevelopment()).toBe(true);
+    expect(isProduction()).toBe(false);
+  });
+});
+
 describe("loadEmailJSConfig", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
