@@ -1,6 +1,7 @@
 #![cfg(test)]
 
-use soroban_sdk::testutils::{Address as _, Events};
+use soroban_sdk::testutils::storage::Persistent as _;
+use soroban_sdk::testutils::{Address as _, Events, Ledger as _, MockAuth, MockAuthInvoke};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{
     contract, contractimpl, contracttype, map, vec, Address, BytesN, Env, IntoVal, Symbol, Val,
@@ -8,6 +9,7 @@ use soroban_sdk::{
 
 use crate::errors::Error;
 use crate::order::Status;
+use crate::storage::{DataKey, LEDGER_THRESHOLD, LEDGER_TO_EXTEND_TO};
 use crate::{Checkout, CheckoutClient};
 
 // ---------------------------------------------------------------------------
@@ -461,7 +463,6 @@ fn test_events_emitted() {
 
     let (client, token, merchant, buyer, checkout) = setup_usdc(&env);
     let id = order_id(&env, 5);
-    let amount = 10_000_i128;
 
     let timestamp: Val = env.ledger().timestamp().into_val(&env);
     let amount: Val = 10_000i128.into_val(&env);
@@ -529,4 +530,208 @@ fn test_events_emitted() {
             ),
         ]
     );
+}
+
+// ---------------------------------------------------------------------------
+// add_token authorization (#496)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_add_token_without_admin_auth_rejected() {
+    let env = Env::default();
+
+    let token = env.register(MockToken, ());
+    let contract = env.register(Checkout, ());
+    let merchant = Address::generate(&env);
+    let client = CheckoutClient::new(&env, &contract);
+
+    // Authorize only the merchant's `initialize` call.
+    env.mock_auths(&[MockAuth {
+        address: &merchant,
+        invoke: &MockAuthInvoke {
+            contract: &contract,
+            fn_name: "initialize",
+            args: (&merchant,).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    client.initialize(&merchant);
+
+    // Drop all authorization: an unauthenticated caller cannot whitelist.
+    env.set_auths(&[]);
+
+    let result = client.try_add_token(&token);
+    assert!(
+        result.is_err(),
+        "add_token must require the merchant's auth"
+    );
+    assert!(
+        !client.is_token_allowed(&token),
+        "a rejected add_token must not whitelist the token"
+    );
+}
+
+// Escrow predicate (#494)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_is_escrowed_only_while_funds_are_held() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token, _, buyer, _) = setup_usdc(&env);
+
+    // Paid: the contract is holding the buyer's funds.
+    let paid = order_id(&env, 31);
+    client.pay(&token, &buyer, &paid, &10_000);
+    let paid_order = client.order(&paid).unwrap();
+    assert!(paid_order.is_escrowed(), "a paid order must be escrowed");
+
+    // Shipped: the escrow has been released to the merchant.
+    let shipped = order_id(&env, 32);
+    client.pay(&token, &buyer, &shipped, &10_000);
+    client.dispatch(&shipped);
+    let shipped_order = client.order(&shipped).unwrap();
+    assert!(
+        !shipped_order.is_escrowed(),
+        "a dispatched order is settled, not escrowed"
+    );
+
+    // Refunded: the escrow has been returned to the buyer.
+    let refunded = order_id(&env, 33);
+    client.pay(&token, &buyer, &refunded, &10_000);
+    client.refund(&refunded);
+    let refunded_order = client.order(&refunded).unwrap();
+    assert!(
+        !refunded_order.is_escrowed(),
+        "a refunded order is settled, not escrowed"
+    );
+
+    // Pending: nothing has been escrowed yet.
+    let pending = order_id(&env, 34);
+    client.create_order(&buyer, &pending, &token, &10_000);
+    let pending_order = client.order(&pending).unwrap();
+    assert!(
+        !pending_order.is_escrowed(),
+        "a pending order must not be escrowed"
+    );
+
+    // is_paid and is_escrowed deliberately differ: Shipped has been paid but
+    // is no longer held in escrow. Inverting either predicate fails here.
+    assert!(paid_order.is_paid());
+    assert!(shipped_order.is_paid());
+    assert!(!shipped_order.is_escrowed());
+}
+
+// ---------------------------------------------------------------------------
+// TTL management (#505)
+// ---------------------------------------------------------------------------
+
+/// Remaining TTL of a persistent key, read from the contract's own storage.
+fn persistent_ttl(env: &Env, contract: &Address, key: &DataKey) -> u32 {
+    env.as_contract(contract, || env.storage().persistent().get_ttl(key))
+}
+
+#[test]
+fn test_order_ttl_is_extended_to_policy_target_on_write() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token, _, buyer, checkout) = setup_usdc(&env);
+    let id = order_id(&env, 41);
+
+    // create_order persists the order; the test env starts the entry at its
+    // minimum persistent TTL.
+    client.create_order(&buyer, &id, &token, &10_000);
+    let initial = persistent_ttl(&env, &checkout, &DataKey::Order(id.clone()));
+    assert!(initial > 0, "the order must carry a TTL after a write");
+
+    // Move to the point where the remaining TTL is just below the refresh
+    // threshold, so the next write must actually extend it.
+    assert!(initial >= LEDGER_THRESHOLD);
+    env.ledger()
+        .set_sequence_number(initial - LEDGER_THRESHOLD + 1);
+
+    // pay() persists the same order again. If set_order stopped calling
+    // extend_ttl the TTL would stay below the policy target and this fails.
+    client.pay(&token, &buyer, &id, &10_000);
+
+    assert_eq!(
+        persistent_ttl(&env, &checkout, &DataKey::Order(id)),
+        LEDGER_TO_EXTEND_TO,
+        "order TTL must be extended to the policy target on write"
+    );
+}
+
+#[test]
+fn test_admin_ttl_is_extended_to_policy_target_on_write() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _, _, checkout) = setup_usdc(&env);
+
+    // initialize() stored the merchant under DataKey::Admin.
+    let initial = persistent_ttl(&env, &checkout, &DataKey::Admin);
+    assert!(
+        initial > 0,
+        "the admin entry must carry a TTL after a write"
+    );
+
+    assert!(initial >= LEDGER_THRESHOLD);
+    env.ledger()
+        .set_sequence_number(initial - LEDGER_THRESHOLD + 1);
+
+    // set_merchant() rewrites DataKey::Admin, so set_admin must extend the TTL.
+    let new_merchant = Address::generate(&env);
+    client.set_merchant(&new_merchant);
+
+    assert_eq!(
+        persistent_ttl(&env, &checkout, &DataKey::Admin),
+        LEDGER_TO_EXTEND_TO,
+        "admin TTL must be extended to the policy target on write"
+    );
+}
+
+#[test]
+fn test_ttl_policy_threshold_is_below_extension_target() {
+    // Guards the invariant the two tests above rely on: extend_ttl only fires
+    // when the remaining TTL is below the threshold, so the threshold must be
+    // strictly smaller than the extension target.
+    //
+    // Evaluated at compile time, so inverting the policy fails the build
+    // rather than silently disabling TTL refresh.
+    const { assert!(LEDGER_THRESHOLD < LEDGER_TO_EXTEND_TO) };
+}
+
+// ---------------------------------------------------------------------------
+// Refunding twice (#499)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_refund_twice_rejected_and_balance_unchanged() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token, _, buyer, checkout) = setup_usdc(&env);
+    let id = order_id(&env, 35);
+
+    client.pay(&token, &buyer, &id, &10_000);
+    client.refund(&id);
+
+    assert_eq!(client.status(&id), Some(Status::Refunded));
+    let buyer_balance_after_refund = usdc_balance(&env, &token, &buyer);
+    assert_eq!(buyer_balance_after_refund, 1_000_000);
+    assert_eq!(usdc_balance(&env, &token, &checkout), 0);
+
+    // A second refund is not a valid lifecycle transition.
+    let result = client.try_refund(&id);
+    assert_eq!(result, Err(Ok(Error::InvalidOrderStatus)));
+
+    // The rejected attempt must not move funds or change the recorded status.
+    assert_eq!(
+        usdc_balance(&env, &token, &buyer),
+        buyer_balance_after_refund
+    );
+    assert_eq!(usdc_balance(&env, &token, &checkout), 0);
+    assert_eq!(client.status(&id), Some(Status::Refunded));
 }
