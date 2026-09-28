@@ -106,3 +106,25 @@ describe("Shop product loading states", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });
+
+describe("Shop page heading hierarchy (Issue #597)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it("renders exactly one h1 and demotes product names to h2", async () => {
+    const request = pendingProducts();
+    renderShop();
+
+    await act(async () => request.resolve([product]));
+
+    const h1s = screen.getAllByRole("heading", { level: 1 });
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]).toHaveTextContent("Welcome to Mova Store");
+
+    expect(screen.getByRole("heading", { level: 2, name: product.name })).toBeInTheDocument();
+    // The price is no longer a heading at all.
+    expect(screen.queryByRole("heading", { name: "$75" })).not.toBeInTheDocument();
+  });
+});
