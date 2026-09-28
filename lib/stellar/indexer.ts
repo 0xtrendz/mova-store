@@ -65,6 +65,9 @@ export class PaymentEventIndexer {
   private readonly seenIds = new Set<string>();
 
   private timer: ReturnType<typeof setInterval> | null = null;
+  /** Prevents a new poll from starting while the previous one is still running. */
+  private inFlight = false;
+  /** Set while the document is hidden; polling resumes on visibilitychange. */
   private paused = false;
   private visibilityListener: (() => void) | null = null;
   private running = false;
@@ -131,14 +134,25 @@ export class PaymentEventIndexer {
   private async tick(callbacks: IndexerCallbacks): Promise<void> {
     if (!this.running || this.paused) return;
 
-    if (!this.initialized) {
-      await this.ensureInitialized(callbacks);
-      if (!this.initialized) {
-        return;
-      }
-    }
+    // Never let the interval outrun its own work. If the previous poll is still
+    // unresolved (a slow getLatestLedger/getEvents), skip this tick entirely —
+    // overlapping polls would read the same cursor, advance it out of order and
+    // deliver the same event twice.
+    if (this.inFlight) return;
+    this.inFlight = true;
 
-    await this.poll(callbacks);
+    try {
+      if (!this.initialized) {
+        await this.ensureInitialized(callbacks);
+        if (!this.initialized) {
+          return;
+        }
+      }
+
+      await this.poll(callbacks);
+    } finally {
+      this.inFlight = false;
+    }
   }
 
   /**
