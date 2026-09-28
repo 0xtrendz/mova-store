@@ -416,6 +416,17 @@ describe("validateEnv", () => {
     expect(config.emailjs.publicKey).toBe("pubkey_789");
     expect(config.admin.adminEmails).toContain("admin@store.org");
   });
+
+  it("prefixes the thrown message with the configuration-errors banner", () => {
+    vi.stubEnv("NEXT_PUBLIC_CHECKOUT_CONTRACT_ID", "");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "");
+    vi.stubEnv("NEXT_PUBLIC_EMAILJS_SERVICE_ID", "");
+    vi.stubEnv("NEXT_PUBLIC_EMAILJS_TEMPLATE_ID", "");
+    vi.stubEnv("NEXT_PUBLIC_EMAILJS_PUBLIC_KEY", "");
+
+    expect(() => validateEnv()).toThrowError(/^Environment configuration errors:/);
+  });
 });
 
 describe("mainnet RPC default", () => {

@@ -26,6 +26,7 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  parseStoragePathFromUrl,
   storageObjectPathFromPublicUrl,
 } from "../../lib/products";
 
@@ -386,6 +387,33 @@ describe("lib/products data layer", () => {
     it("returns null for relative URLs and malformed object encoding", () => {
       expect(storageObjectPathFromPublicUrl("/storage/v1/object/public/products/a.jpg")).toBeNull();
       expect(storageObjectPathFromPublicUrl(publicUrl("a%ZZ.jpg"))).toBeNull();
+    });
+  });
+
+  describe("parseStoragePathFromUrl", () => {
+    it("recovers the object path from a public URL in the given bucket", () => {
+      expect(
+        parseStoragePathFromUrl(
+          "https://proj.supabase.co/storage/v1/object/public/products/12345-abc.jpg",
+          "products"
+        )
+      ).toBe("12345-abc.jpg");
+    });
+
+    it("returns null for missing, empty and non-string inputs", () => {
+      expect(parseStoragePathFromUrl("")).toBeNull();
+      expect(parseStoragePathFromUrl(null)).toBeNull();
+      expect(parseStoragePathFromUrl(undefined)).toBeNull();
+      expect(parseStoragePathFromUrl(42)).toBeNull();
+    });
+
+    it("returns null for an object living in another bucket", () => {
+      expect(
+        parseStoragePathFromUrl(
+          "https://proj.supabase.co/storage/v1/object/public/avatars/a.jpg",
+          "products"
+        )
+      ).toBeNull();
     });
   });
 
