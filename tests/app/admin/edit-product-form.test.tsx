@@ -34,7 +34,7 @@ describe("EditProductForm status banners reset and error styling (#27)", () => {
 
     expect(await screen.findByDisplayValue("Alpha Sneakers")).toBeInTheDocument();
     expect(screen.getByDisplayValue("120")).toBeInTheDocument();
-    expect(screen.getByAltText("Existing product")).toHaveAttribute(
+    expect(screen.getByAltText("Alpha Sneakers current image")).toHaveAttribute(
       "src",
       "https://example.com/alpha.jpg"
     );
