@@ -33,7 +33,7 @@
     "verify": "npm run lint && npm run type-check && npm run test:coverage && npm run build && npm run format:check",
     "test:naming": "node scripts/check-test-names.mjs",
     "deploy:testnet": "./scripts/deploy-testnet.sh",
-    "prepare": "echo 'Mova Store ready!'"
+    "prepare": "node scripts/setup-git-hooks.mjs"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
