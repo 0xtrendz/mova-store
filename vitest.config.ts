@@ -3,9 +3,12 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 export default defineConfig({
-  define: {
-    "process.env.NODE_ENV": JSON.stringify("test"),
-  },
+  // `process.env.NODE_ENV` is intentionally not set through `define` here.
+  // A build-time `define` and the `test.env` entry below were two sources of
+  // truth for the same variable: the static replacement won inside the
+  // transformed modules, so the `=== "development"` guards in `lib/env.ts` and
+  // `components/ErrorBoundary.tsx` could never match under test. `test.env` is
+  // now the single place the value is declared.
   plugins: [
     react({
       include: /\.(jsx|tsx|js|ts)$/,
