@@ -21,6 +21,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "bundle:report": "node scripts/bundle-report.mjs",
+    "bundle:check": "node scripts/bundle-report.mjs --strict",
     "lint": "next lint --dir app --dir components --dir lib --dir hooks --dir context --dir tests --dir __tests__",
     "lint:fix": "next lint --fix --dir app --dir components --dir lib --dir hooks --dir context --dir tests --dir __tests__",
     "type-check": "tsc --noEmit --skipLibCheck",
