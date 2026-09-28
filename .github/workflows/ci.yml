@@ -173,10 +173,13 @@ jobs:
         with:
           tool: cargo-audit
 
+      # A security gate that cannot fail is documentation, not a control.
+      # rust-security is one of ci-success's needs, so an advisory found here
+      # must fail the job. Tolerate a specific advisory only by adding an
+      # explicit `--ignore <RUSTSEC-id>` with a comment saying why.
       - name: Run cargo audit
         working-directory: contracts/checkout
         run: cargo audit
-        continue-on-error: true
 
   # Summary job that requires all checks to pass
   ci-success:
