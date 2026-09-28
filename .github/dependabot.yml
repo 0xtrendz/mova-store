@@ -19,6 +19,16 @@ updates:
       prefix-development: "chore(deps-dev)"
       include: "scope"
     groups:
+      # next, eslint-config-next and @next/* must move together:
+      # eslint-config-next depends on @next/eslint-plugin-next at its own
+      # exact version, so bumping one alone desynchronises the lint rules
+      # from the framework version.
+      nextjs-toolchain:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+          - "@next/*"
+          - "eslint-plugin-next"
       # Minor and patch updates are safe to review together; majors stay
       # one-PR-per-dependency so a breaking upgrade can be evaluated alone.
       npm-minor-patch:

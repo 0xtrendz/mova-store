@@ -43,6 +43,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check next / eslint-config-next are in step
+        run: |
+          node -e "const p=require('./package.json');const n=p.dependencies&&p.dependencies.next;const e=p.devDependencies&&p.devDependencies['eslint-config-next'];if(!n||!e){console.error('Both next and eslint-config-next must be declared in package.json');process.exit(1);}if(n!==e){console.error('next ('+n+') and eslint-config-next ('+e+') must be pinned to the same version');process.exit(1);}console.log('next and eslint-config-next are both '+n);"
+
       # Order matters: a step that fails skips every step after it. Formatting is
       # therefore reported last on purpose, so a repo-wide style drift cannot hide
       # the results of the type check, the tests and the build.
