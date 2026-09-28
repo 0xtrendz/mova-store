@@ -31,8 +31,13 @@ const Toast = ({ message, show, onClose, time = 3000 }) => {
       }`}
     >
       {message}
-      <button onClick={onClose} className="ml-4 text-purple-500">
-        ✕
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Dismiss notification"
+        className="ml-4 text-purple-500"
+      >
+        <span aria-hidden="true">✕</span>
       </button>
     </div>
   );
