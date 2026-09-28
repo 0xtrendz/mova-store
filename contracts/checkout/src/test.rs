@@ -836,3 +836,24 @@ fn test_pay_with_a_different_token_than_create_order() {
     assert_eq!(usdc_balance(&env, &token_b, &buyer), 950_000);
     assert_eq!(usdc_balance(&env, &token_b, &contract), 50_000);
 }
+
+#[test]
+fn test_status_and_is_paid_after_refund() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, token, _, buyer, checkout) = setup_usdc(&env);
+    let id = order_id(&env, 33);
+
+    client.pay(&token, &buyer, &id, &100_000);
+    assert!(client.is_paid(&id));
+
+    client.refund(&id);
+
+    // Refunded is the boundary of `is_paid`: the escrow went back to the buyer,
+    // so the order is no longer considered settled.
+    assert_eq!(client.status(&id), Some(Status::Refunded));
+    assert!(!client.is_paid(&id));
+    assert_eq!(usdc_balance(&env, &token, &checkout), 0);
+    assert_eq!(usdc_balance(&env, &token, &buyer), 1_000_000);
+}
