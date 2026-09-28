@@ -10,10 +10,12 @@ const EditProductForm = ({ productId, onProductUpdated }) => {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [priceError, setPriceError] = useState("");
 
   useEffect(() => {
     setSuccessMessage("");
     setErrorMessage("");
+    setPriceError("");
  
     const fetchProduct = async () => {
       setLoading(true);
@@ -42,6 +44,16 @@ const EditProductForm = ({ productId, onProductUpdated }) => {
     e.preventDefault();
     setSuccessMessage("");
     setErrorMessage("");
+    setPriceError("");
+
+    // Guard the edit boundary itself: clearing the field or typing a malformed
+    // value yields NaN, and a negative value must never reach the data layer.
+    const parsedPrice = parseFloat(productPrice);
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      setPriceError("Please enter a valid price (0 or greater)");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -53,7 +65,7 @@ const EditProductForm = ({ productId, onProductUpdated }) => {
 
       await updateProduct(productId, {
         name: productName,
-        price: parseFloat(productPrice),
+        price: parsedPrice,
         img: imageUrl,
       });
 
@@ -105,12 +117,28 @@ const EditProductForm = ({ productId, onProductUpdated }) => {
           <input
             id="edit-product-price"
             type="number"
+            min="0"
             step="0.01"
             className="w-full p-3 mt-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
             value={productPrice}
-            onChange={(e) => setProductPrice(e.target.value)}
+            onChange={(e) => {
+              setProductPrice(e.target.value);
+              if (priceError) setPriceError("");
+            }}
+            aria-invalid={priceError ? "true" : undefined}
+            aria-describedby={priceError ? "edit-product-price-error" : undefined}
             required
           />
+          {priceError && (
+            <p
+              id="edit-product-price-error"
+              role="alert"
+              data-testid="price-error"
+              className="mt-2 text-sm text-red-600"
+            >
+              {priceError}
+            </p>
+          )}
         </div>
         <div className="mb-6">
           <label className="block text-gray-700 text-lg font-semibold">Product Image</label>
