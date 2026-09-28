@@ -159,10 +159,21 @@ create policy "Users can read own orders"
   to authenticated
   using (auth.uid() = user_id or auth.email() = user_email);
 
--- Authenticated users or guest checkout can create order records
+-- Orders Row Level Security (insert):
+-- Only authenticated buyers may create order rows, and only for themselves.
+-- The `anon` role is deliberately excluded: holding the public anon key must not
+-- be enough to forge an order for an arbitrary user_id / user_email.
+--
+-- New rows must also start as 'Pending'. A browser can therefore never write a
+-- 'Paid' / 'Shipped' / 'Refunded' / 'Completed' row: payment is verified
+-- server-side (against the on-chain transaction) before the status is advanced.
 drop policy if exists "Users can insert orders" on public.orders;
-create policy "Users can insert orders"
+drop policy if exists "Users can insert own orders" on public.orders;
+create policy "Users can insert own orders"
   on public.orders for insert
-  to authenticated, anon
-  with check (true);
+  to authenticated
+  with check (
+    auth.uid() = user_id
+    and status = 'Pending'
+  );
 

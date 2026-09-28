@@ -18,6 +18,30 @@
 Products live in the `products` table; images in the public `products` storage bucket.
 
 
+## Orders: who may insert rows
+
+Only an authenticated buyer may create an order row, and only for their own
+`user_id`:
+
+```sql
+create policy "Users can insert own orders"
+  on public.orders for insert
+  to authenticated
+  with check (auth.uid() = user_id and status = 'Pending');
+```
+
+Consequences to be aware of when changing the checkout flow:
+
+- **No `anon` inserts.** A request carrying only the public anon key is rejected.
+  Guest checkout must therefore not write to `orders` directly; it either signs the
+  buyer in or keeps the order client-side until it is claimed.
+- **No client-written status.** The insert policy pins `status` to `'Pending'`, so a
+  forged `'Paid'` row cannot come from the browser. Advancing the status is a
+  server/admin action performed *after* the payment is verified on-chain (see the
+  admin update policy in `schema.sql`).
+- **`total`** is still guarded by the column's `total >= 0` check, and the
+  authoritative amount is the value paid to the checkout contract, not the value in
+  the request body.
 ## admin_users: read access
 
 `public.admin_users` is the privileged allowlist that `public.is_admin()` reads.
