@@ -39,7 +39,12 @@ export function bytes32ToScVal(bytes: Uint8Array | string): xdr.ScVal {
   if (arr.length !== 32) {
     throw new Error(`order_id must be exactly 32 bytes (got ${arr.length})`);
   }
-  return xdr.ScVal.scvBytes(arr as any);
+  // Pass a copy: `scvBytes` retains the reference it is handed, so without this a
+  // later mutation of the caller's array would silently change the built ScVal.
+  // NOTE: the `as any` widening cast here is deliberately left open-coded - issue
+  // #552 tracks centralizing it behind the `toSdkBytes` helper, so do not fold the
+  // two changes together.
+  return xdr.ScVal.scvBytes(arr.slice() as any);
 }
 
 /**
@@ -153,7 +158,7 @@ export async function hashOrderId(orderId: string): Promise<Uint8Array> {
  * True when `value` is already a 32-byte order id rendered as hex.
  */
 export function isOrderIdHashHex(value: string): boolean {
-  return /^(0x)?[0-9a-fA-F]{64}$/.test(value);
+  return /^(0[xX])?[0-9a-fA-F]{64}$/.test(value);
 }
 
 /**
