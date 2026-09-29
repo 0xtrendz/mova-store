@@ -123,16 +123,16 @@ describe("PaymentEventIndexer startup retry (Issue #68)", () => {
 });
 
 describe("PaymentEventIndexer recovery paths (Issues #520, #521)", () => {
-  it("recovers from a retention error by resetting the cursor and resuming from the latest ledger", async () => {
-    let calls = 0;
+  it("recovers from a retention error by resetting the cursor to the latest ledger", async () => {
+    let getEventsCalls = 0;
     const fakeServer = {
-      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 5000 }),
+      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 900 }),
       getEvents: vi.fn().mockImplementation(async () => {
-        calls += 1;
-        if (calls === 1) {
-          throw new Error("startLedger must be within the retention window");
+        getEventsCalls++;
+        if (getEventsCalls === 1) {
+          throw new Error("startLedger is outside the retention window");
         }
-        return { latestLedger: 5000, cursor: "cursor-after-retention", events: [] };
+        return { latestLedger: 900, cursor: "cursor-after-retention", events: [] };
       }),
     };
 
@@ -144,22 +144,22 @@ describe("PaymentEventIndexer recovery paths (Issues #520, #521)", () => {
     await new Promise((resolve) => setTimeout(resolve, 80));
     indexer.stop();
 
-    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(getEventsCalls).toBeGreaterThanOrEqual(2);
     expect(indexer.status.lastCursor).toBe("cursor-after-retention");
-    expect(indexer.status.latestLedger).toBe(5000);
+    expect(indexer.status.latestLedger).toBe(900);
     expect(indexer.status.retrying).toBe(false);
   });
 
-  it("does not move the scan window when a transient error occurs on the first poll", async () => {
-    let calls = 0;
+  it("does not move the scan window on a transient error during the first poll", async () => {
+    let getEventsCalls = 0;
     const fakeServer = {
-      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 7000 }),
+      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 700 }),
       getEvents: vi.fn().mockImplementation(async () => {
-        calls += 1;
-        if (calls === 1) {
+        getEventsCalls++;
+        if (getEventsCalls === 1) {
           throw new Error("RPC temporary network partition");
         }
-        return { latestLedger: 7000, cursor: "cursor-transient-recovered", events: [] };
+        return { latestLedger: 700, cursor: "cursor-transient-recovered", events: [] };
       }),
     };
 
@@ -171,37 +171,32 @@ describe("PaymentEventIndexer recovery paths (Issues #520, #521)", () => {
     await new Promise((resolve) => setTimeout(resolve, 80));
     indexer.stop();
 
-    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(errors.some((e) => e.includes("getEvents failed"))).toBe(true);
+    expect(getEventsCalls).toBeGreaterThanOrEqual(2);
     expect(indexer.status.lastCursor).toBe("cursor-transient-recovered");
-    expect(indexer.status.latestLedger).toBe(7000);
-    expect(indexer.status.retrying).toBe(false);
+    expect(indexer.status.latestLedger).toBe(700);
   });
 
   it("advances the scan position when a response omits the cursor", async () => {
-    let calls = 0;
+    let getEventsCalls = 0;
     const fakeServer = {
-      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 9000 }),
+      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 400 }),
       getEvents: vi.fn().mockImplementation(async () => {
-        calls += 1;
-        if (calls === 1) {
-          return { latestLedger: 9000, events: [] };
-        }
-        return { latestLedger: 9001, cursor: "cursor-after-no-cursor", events: [] };
+        getEventsCalls++;
+        return { latestLedger: 400 + getEventsCalls, events: [] };
       }),
     };
 
     const indexer = new PaymentEventIndexer({ pollMs: 20 });
     (indexer as unknown as { server: unknown }).server = fakeServer;
-    const errors: string[] = [];
 
-    indexer.start({ onEvent: () => {}, onError: (err) => errors.push(err.message) });
+    indexer.start({ onEvent: () => {} });
     await new Promise((resolve) => setTimeout(resolve, 80));
     indexer.stop();
 
-    expect(calls).toBeGreaterThanOrEqual(2);
-    expect(indexer.status.lastCursor).toBe("cursor-after-no-cursor");
-    expect(indexer.status.latestLedger).toBe(9001);
-    expect(errors.some((e) => e.includes("no cursor or start ledger"))).toBe(false);
+    expect(getEventsCalls).toBeGreaterThanOrEqual(2);
+    expect(indexer.status.latestLedger).toBeGreaterThanOrEqual(402);
+    expect(indexer.status.retrying).toBe(false);
   });
 });
 

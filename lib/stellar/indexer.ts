@@ -8,14 +8,14 @@ import {
 } from "./config";
 import { scValToString } from "./scval";
 
-// ----------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // Real-time event indexer.
 //
 // Polls `getEvents` (cursor-paginated) for the checkout contract and decodes
 // the contract's events (`pay`, `create_order`, `dispatch`, `refund`) so the
 // UI can update instantly when a payment lands. Uses a ledger backfill on
 // first connect, then advances by cursor so nothing is missed between polls.
-// ----------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 
 export interface IndexedEvent {
   id: string;
@@ -193,8 +193,8 @@ export class PaymentEventIndexer {
 
   /**
    * Resume polling and run one catch-up tick immediately. The cursor is kept
-   * across the pause, so the catch-up reads every event that landed while
-   * the tab was hidden — nothing is skipped.
+   * across the pause, so the catch-up reads every event that landed while the
+   * tab was hidden — nothing is skipped.
    */
   private resume(callbacks: IndexerCallbacks): void {
     if (!this.paused) return;
@@ -236,6 +236,8 @@ export class PaymentEventIndexer {
       this.latestLedger = res.latestLedger;
       this.lastError = undefined;
 
+      // Once a cursor is available, drop the start-ledger window so the next
+      // poll advances by cursor instead of re-scanning the backfill range.
       if (this.startLedger !== undefined) {
         this.startLedger = undefined;
       }
@@ -290,6 +292,11 @@ export class PaymentEventIndexer {
         this.latestLedger - RETENTION_RETRY_LEDGER_DELTA
       );
     }
+  }
+
+  /** Exposed for tests: current scan position (cursor or start ledger). */
+  get scanPosition(): { cursor?: string; startLedger?: number } {
+    return { cursor: this.cursor, startLedger: this.startLedger };
   }
 
   private decodeEvent(raw: rpc.Api.EventResponse): IndexedEvent | null {
