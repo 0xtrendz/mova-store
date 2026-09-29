@@ -81,6 +81,11 @@ export function buildInvocationTransaction(
  * return value ScVal. Read calls that hit a HostError (e.g. `balance` for an
  * address with no entry) resolve to `null` instead of throwing, mirroring how
  * the contract treats "missing" as zero/absent.
+ *
+ * "Absent" (an empty result or a simulation error) is reported as `null` so
+ * callers can distinguish it from a thrown error. Errors thrown by the RPC
+ * itself (network failures, malformed responses) still propagate to the
+ * caller as exceptions.
  */
 export async function simulateContractRead(
   server: rpc.Server,
