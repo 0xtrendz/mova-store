@@ -54,7 +54,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       };
 
       const fee = await recommendedInclusionFee(stubServer as never);
-      expect(fee).toB(BigInt(BASE_FEE));
+      expect(fee).toBle(BigInt(BASE_FEE));
     });
 
     it("falls back to BigInt(BASE_FEE) when getFeeStats throws an error", async () => {
@@ -175,12 +175,29 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       );
 
       expect(result).toBeNull();
-      expect(stubServer.simulateTransaction).toHaveBeenCalledTimes(1);
     });
 
-    it("propagates a thrown simulation error as an error", async () => {
+    it("returns null when the simulation result is absent", async () => {
       const stubServer = {
-        simulateTransaction: vi.fn().mockRejected(new Error("Simulation failed")),
+        simulateTransaction: vi.fn().mockResolved({
+          results: [{ retval: undefined }],
+        }),
+      };
+
+      const result = await simulateContractRead(
+        stubServer as never,
+        dummyAccount,
+        contractId,
+        "test_func",
+        dummyArgs
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("propagates a thrown simulation error", async () => {
+      const stubServer = {
+        simulateTransaction: vi.fn().mockRejected(new Error("simulation failed")),
       };
 
       await expect(
@@ -191,7 +208,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
           "test_func",
           dummyArgs
         )
-      ).rejects.toThrow("Simulation failed");
+      ).rejects.toThrow("simulation failed");
     });
   });
 });

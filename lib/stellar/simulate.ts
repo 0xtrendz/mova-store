@@ -81,11 +81,6 @@ export function buildInvocationTransaction(
  * return value ScVal. Read calls that hit a HostError (e.g. `balance` for an
  * address with no entry) resolve to `null` instead of throwing, mirroring how
  * the contract treats "missing" as zero/absent.
- *
- * A simulation error (HostError, invalid wasm, etc.) is treated as "absent"
- * and resolves to `null`; callers distinguish this from a thrown transport
- * error, which still propagates. An empty result (no retval) also resolves
- * to `null` so callers can branch on "absent" vs "failed".
  */
 export async function simulateContractRead(
   server: rpc.Server,
@@ -98,6 +93,22 @@ export async function simulateContractRead(
   const tx = buildInvocationTransaction(account, contractId, fn, args);
   const sim = await server.simulateTransaction(tx);
   if (rpc.Api.isSimulationError(sim)) return null;
+  return sim.result?.retval ?? null;
+}
+
+export async function simulateContractReadOrThrow(
+  server: rpc.Server,
+  contractId: string,
+  fn: string,
+  args: xdr.ScVal[],
+  source?: string
+): Promise<xdr.ScVal | null> {
+  const account = new Account(source ?? Keypair.random().publicKey(), "0");
+  const tx = buildInvocationTransaction(account, contractId, fn, args);
+  const sim = await server.simulateTransaction(tx);
+  if (rpc.Api.isSimulationError(sim)) {
+    throw new Error(String(sim.error));
+  }
   return sim.result?.retval ?? null;
 }
 
