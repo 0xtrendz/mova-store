@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import AdminGuard from "../../../components/AdminGuard";
 import StellarWalletButton from "../../../components/StellarWalletButton";
 import { PaymentEventIndexer, IndexedEvent } from "../../../lib/stellar/indexer";
@@ -215,6 +215,41 @@ const OrdersManagementContent = () => {
     };
   }, []);
 
+  // Confirmation dialog state for irreversible escrow actions.
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "dispatch" | "refund";
+    orderId: string;
+    amount: string;
+    tokenSymbol: string;
+  } | null>(null);
+  const confirmResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
+
+  // Ask the admin to explicitly confirm an irreversible value transfer.
+  // Resolves true only when the admin clicks the confirm button.
+  const requestConfirmation = useCallback(
+    (action: {
+      type: "dispatch" | "refund";
+      orderId: string;
+      amount: string;
+      tokenSymbol: string;
+    }) => {
+      return new Promise<boolean>((resolve) => {
+        confirmResolverRef.current = resolve;
+        setConfirmAction(action);
+      });
+    },
+    []
+  );
+
+  const resolveConfirmation = useCallback((confirmed: boolean) => {
+    const resolver = confirmResolverRef.current;
+    confirmResolverRef.current = null;
+    setConfirmAction(null);
+    if (resolver) {
+      resolver(confirmed);
+    }
+  }, []);
+
   // Handle dispatch order
   const handleDispatch = useCallback(async (orderId: string) => {
     setProcessingOrderId(orderId);
@@ -222,6 +257,18 @@ const OrdersManagementContent = () => {
     setSuccessMessage(null);
 
     try {
+      const order = orders.get(orderId);
+      const confirmed = await requestConfirmation({
+        type: "dispatch",
+        orderId,
+        amount: order?.amount ?? "unknown",
+        tokenSymbol: order?.tokenSymbol ?? "",
+      });
+      if (!confirmed) {
+        setProcessingOrderId(null);
+        return;
+      }
+
       const result = await dispatchOrder(orderId);
 
       if (result.success) {
@@ -252,6 +299,18 @@ const OrdersManagementContent = () => {
     setSuccessMessage(null);
 
     try {
+      const order = orders.get(orderId);
+      const confirmed = await requestConfirmation({
+        type: "refund",
+        orderId,
+        amount: order?.amount ?? "unknown",
+        tokenSymbol: order?.tokenSymbol ?? "",
+      });
+      if (!confirmed) {
+        setProcessingOrderId(null);
+        return;
+      }
+
       const result = await refundOrder(orderId);
 
       if (result.success) {
@@ -273,7 +332,7 @@ const OrdersManagementContent = () => {
     } finally {
       setProcessingOrderId(null);
     }
-  }, []);
+  }, [orders, requestConfirmation]);
 
   // Sort orders by timestamp (newest first) and derive the status counts in a
   // single pass. Both are pure functions of the order map, so memoise them:
@@ -494,6 +553,66 @@ const OrdersManagementContent = () => {
           sure you're connected with the correct Freighter wallet.
         </p>
       </div>
+
+      {/* Confirmation dialog for irreversible escrow actions */}
+      {confirmAction && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-action-title"
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h2
+              id="confirm-action-title"
+              className="text-lg font-semibold text-gray-800 mb-2"
+            >
+              {confirmAction.type === "dispatch"
+                ? "Confirm dispatch and release escrow"
+                : "Confirm refund from escrow"}
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              {confirmAction.type === "dispatch"
+                ? "This will release the escrowed funds to the merchant wallet. This action cannot be undone on-chain."
+                : "This will return the escrowed funds to the buyer's wallet. This action cannot be undone on-chain."}
+            </p>
+            <div className="bg-gray-50 rounded p-3 mb-4 text-sm">
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-500">Order</span>
+                <span className="font-mono text-gray-800">
+                  {truncateAddress(confirmAction.orderId)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Amount</span>
+                <span className="font-semibold text-gray-800">
+                  {confirmAction.amount} {confirmAction.tokenSymbol}
+                </span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => resolveConfirmation(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => resolveConfirmation(true)}
+                className={`px-4 py-2 text-white rounded ${
+                  confirmAction.type === "dispatch"
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-purple-600 hover:bg-purple-700"
+                }`}
+              >
+                {confirmAction.type === "dispatch" ? "Release escrow" : "Refund buyer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

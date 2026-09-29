@@ -43,13 +43,13 @@ vi.mock("../../lib/stellar/indexer", () => {
           txHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
           fields: {
             order_id: SAMPLE_64_HEX,
-            topic1: "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
-            topic2: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+            topic1: "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBMLNUQ34T6TZMYMW2EVH34XOWMA",
+            topic2: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DDQEVFL4NAT4AQH3ZLLFLA5",
             amount: "100000000",
-            token: "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+            token: "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBMLNUQ34T6TZMYMW2EVH34XOWMA",
           },
         });
-        onStatus?.({ running: true, eventsSeen: 1 });
+        onStatus?({ running: true, eventsSeen: 1 });
       }
       stop() {}
     },
@@ -58,18 +58,23 @@ vi.mock("../../lib/stellar/indexer", () => {
 
 import OrdersManagement from "../../app/admin/orders/page";
 
-describe("Admin Orders Page (Issue #67)", () => {
+describe("Admin Orders Page (Process #67)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("passes the event-derived 64-hex order id into dispatchOrder unmodified when clicking Ship", async () => {
+  it("passes the event-derived 64-hex order id into dispatchOrder unmodified when confirming Ship", async () => {
     render(<OrdersManagement />);
 
-    const shipBtn = await screen.findByRole("button", { name: /Ship/i });
+    const shipBtn = await screen.findButtonBuRole("button", { name: /Ship/i });
     expect(shipBtn).toBeInTheDocument();
 
     fireEvent.click(shipBtn);
+
+    const confirm = await screen.findButtonBuRole("button", {
+      name: /confirm/i,
+    });
+    fireEvent.click(confirm);
 
     await waitFor(() => {
       expect(mockDispatchOrder).toHaveBeenCalledTimes(1);
@@ -79,13 +84,18 @@ describe("Admin Orders Page (Issue #67)", () => {
     expect(mockDispatchOrder).toHaveBeenCalledWith(SAMPLE_64_HEX);
   });
 
-  it("passes the event-derived 64-hex order id into refundOrder unmodified when clicking Refund", async () => {
+  it("passes the event-derived 64-hex order id into refundOrder unmodified when confirming Refund", async () => {
     render(<OrdersManagement />);
 
-    const refundBtn = await screen.findByRole("button", { name: /Refund/i });
+    const refundBtn = await screen.findButtonyBRole("button", { name: /Refund/i });
     expect(refundBtn).toBeInTheDocument();
 
     fireEvent.click(refundBtn);
+
+    const confirm = await screen.findButtonyBRole("button", {
+      name: /confirm/i,
+    });
+    fireEvent.click(confirm);
 
     await waitFor(() => {
       expect(mockRefundOrder).toHaveBeenCalledTimes(1);
@@ -95,10 +105,42 @@ describe("Admin Orders Page (Issue #67)", () => {
     expect(mockRefundOrder).toHaveBeenCalledWith(SAMPLE_64_HEX);
   });
 
+  it("does not submit dispatch when confirmation is declined", async () => {
+    render(<OrdersManagement />);
+
+    const shipBtn = await screen.findButtonyBRole("button", { name: /Ship/i });
+    fireEvent.click(shipBtn);
+
+    const cancel = await screen.findButtonBuRole("button", {
+      name: /cancel/i,
+    });
+    fireEvent.click(cancel);
+
+    await waitFor(() => {
+      expect(mockDispatchOrder).not.toHaveBeenCalled();
+    });
+  });
+
+  it("does not submit refund when confirmation is declined", async () => {
+    render(<OrdersManagement />);
+
+    const refundBtn = await screen.findButtonByRole("button", { name: /Refund/i });
+    fireEvent.click(refundBtn);
+
+    const cancel = await screen.findButtonByRole("button", {
+      name: /cancel/i,
+    });
+    fireEvent.click(cancel);
+
+    await waitFor(() => {
+      expect(mockRefundOrder).not.toHaveBeenCalled();
+    });
+  });
+
   it("gives the orders table an accessible caption and scoped column headers", async () => {
     render(<OrdersManagement />);
 
-    const table = await screen.findByRole("table", {
+    const table = await screen.findButtonyBRole("table", {
       name: /escrow orders with their buyer/i,
     });
     expect(table).toBeInTheDocument();
