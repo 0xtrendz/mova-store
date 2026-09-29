@@ -236,6 +236,8 @@ export class PaymentEventIndexer {
       this.latestLedger = res.latestLedger;
       this.lastError = undefined;
 
+      // A successful poll means the window is settled: drop the backfill
+      // start ledger so subsequent polls advance by cursor only.
       if (this.startLedger !== undefined) {
         this.startLedger = undefined;
       }
@@ -282,6 +284,9 @@ export class PaymentEventIndexer {
   /**
    * If the requested start ledger predates the RPC's retention window, roll
    * the window forward toward the tip so the next poll can proceed.
+   *
+   * Only applies while a backfill window is active; once the indexer has
+   * settled onto a cursor a retention error must not silently move it.
    */
   private recoverFromRetentionError(): void {
     if (this.startLedger !== undefined && this.latestLedger !== undefined) {
