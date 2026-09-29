@@ -89,11 +89,13 @@ const OrderRow = ({
   onDispatch,
   onRefund,
   isProcessing,
+  error,
 }: {
   order: OrderEvent;
   onDispatch: (orderId: string) => void;
   onRefund: (orderId: string) => void;
   isProcessing: boolean;
+  error?: string | null;
 }) => {
   const canDispatch = order.status === "Paid";
   const canRefund = order.status === "Paid";
@@ -153,6 +155,11 @@ const OrderRow = ({
           )}
           {!canDispatch && !canRefund && <span className="text-gray-400 text-sm">-</span>}
         </div>
+        {error && (
+          <div className="mt-2 text-xs text-red-600" role="alert">
+            {error}
+          </div>
+        )}
       </td>
     </tr>
   );
@@ -163,8 +170,8 @@ const OrdersManagementContent = () => {
   const [orders, setOrders] = useState<Map<string, OrderEvent>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [orderErrors, setOrderErrors] = useState<Record<string, string>>({});
+  const [orderSuccesses, setOrderSuccesses] = useState<Record<string, string>>({});
   const [indexerStatus, setIndexerStatus] = useState<{
     running: boolean;
     eventsSeen: number;
@@ -199,7 +206,6 @@ const OrdersManagementContent = () => {
         setIsLoading(false);
       },
       onError: (err) => {
-        setError(err.message);
         setIsLoading(false);
       },
     });
@@ -218,14 +224,25 @@ const OrdersManagementContent = () => {
   // Handle dispatch order
   const handleDispatch = useCallback(async (orderId: string) => {
     setProcessingOrderId(orderId);
-    setError(null);
-    setSuccessMessage(null);
+    setOrderErrors((prev) => {
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
+    setOrderSuccesses((prev) => {
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
 
     try {
       const result = await dispatchOrder(orderId);
 
       if (result.success) {
-        setSuccessMessage(`Order ${truncateAddress(orderId)} dispatched successfully!`);
+        setOrderSuccesses((prev) => ({
+          ...prev,
+          [orderId]: `Order ${truncateAddress(orderId)} dispatched successfully!`,
+        }));
         // Update local state
         setOrders((prev) => {
           const newMap = new Map(prev);
@@ -236,10 +253,16 @@ const OrdersManagementContent = () => {
           return newMap;
         });
       } else {
-        setError(result.error || "Failed to dispatch order");
+        setOrderErrors((prev) => ({
+          ...prev,
+          [orderId]: result.error || "Failed to dispatch order",
+        }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error occurred");
+      setOrderErrors((prev) => ({
+        ...prev,
+        [orderId]: err instanceof Error ? err.message : "Unknown error occurred",
+      }));
     } finally {
       setProcessingOrderId(null);
     }
@@ -248,14 +271,25 @@ const OrdersManagementContent = () => {
   // Handle refund order
   const handleRefund = useCallback(async (orderId: string) => {
     setProcessingOrderId(orderId);
-    setError(null);
-    setSuccessMessage(null);
+    setOrderErrors((prev) => {
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
+    setOrderSuccesses((prev) => {
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
 
     try {
       const result = await refundOrder(orderId);
 
       if (result.success) {
-        setSuccessMessage(`Order ${truncateAddress(orderId)} refunded successfully!`);
+        setOrderSuccesses((prev) => ({
+          ...prev,
+          [orderId]: `Order ${truncateAddress(orderId)} refunded successfully!`,
+        }));
         // Update local state
         setOrders((prev) => {
           const newMap = new Map(prev);
@@ -266,10 +300,16 @@ const OrdersManagementContent = () => {
           return newMap;
         });
       } else {
-        setError(result.error || "Failed to refund order");
+        setOrderErrors((prev) => ({
+          ...prev,
+          [orderId]: result.error || "Failed to refund order",
+        }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error occurred");
+      setOrderErrors((prev) => ({
+        ...prev,
+        [orderId]: err instanceof Error ? err.message : "Unknown error occurred",
+      }));
     } finally {
       setProcessingOrderId(null);
     }
@@ -346,17 +386,6 @@ const OrdersManagementContent = () => {
       </div>
 
       {/* Messages */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
-      {successMessage && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4 flex items-center gap-2">
-          <MdCheckCircle className="text-green-500" />
-          {successMessage}
-        </div>
-      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
@@ -455,6 +484,7 @@ const OrdersManagementContent = () => {
                     onDispatch={handleDispatch}
                     onRefund={handleRefund}
                     isProcessing={processingOrderId === order.orderId}
+                    error={orderErrors[order.orderId]}
                   />
                 ))}
               </tbody>
