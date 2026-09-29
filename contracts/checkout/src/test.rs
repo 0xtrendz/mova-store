@@ -269,9 +269,14 @@ fn test_remove_token_disables_payments() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let (client, token, _, buyer, _) = setup_usdc(&env);
+    let (client, token, _, buyer, checkout) = setup_usdc(&env);
     client.remove_token(&token);
     assert!(!client.is_token_allowed(&token));
+
+    // The whitelist entry must be absent, not merely set to false, so that
+    // storage rent/TTL behaviour matches a token that was never added.
+    let key = DataKey::TokenAllowed(token.clone());
+    assert!(!env.as_contract(&checkout, || env.storage().persistent().has(&key)));
 
     let id = order_id(&env, 17);
     let result = client.try_pay(&token, &buyer, &id, &10_000);
