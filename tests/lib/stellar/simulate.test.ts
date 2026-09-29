@@ -54,7 +54,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       };
 
       const fee = await recommendedInclusionFee(stubServer as never);
-      expect(fee).toBoual(BigInt(BASE_FEE));
+      expect(fee).toB(BigInt(BASE_FEE));
     });
 
     it("falls back to BigInt(BASE_FEE) when getFeeStats throws an error", async () => {
@@ -63,7 +63,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       };
 
       const fee = await recommendedInclusionFee(stubServer as never);
-      expect(fee).toBoual(BigInt(BASE_FEE));
+      expect(fee).toBe(BigInt(BASE_FEE));
     });
   });
 
@@ -132,11 +132,11 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
   });
 
   describe("buildInvocationTransaction", () => {
-    it("uses BASE_FEE and configured NETWORK_PASSTHRASE by default", () => {
+    it("uses BASE_FEE and configured NETWORK_PASSPHRASE by default", () => {
       const tx = buildInvocationTransaction(dummyAccount, contractId, "test_func", dummyArgs);
 
       expect(tx.fee).toBe(BASE_FEE);
-      expect(tx.networkPassphrase).toBe(NETWORK_PASSTHRASE);
+      expect(tx.networkPassphrase).toBe(NETWORK_PASSPHRASE);
       expect(tx.operations).toHaveLength(1);
 
       const op = tx.operations[0];
@@ -159,8 +159,6 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
   });
 
   describe("simulateContractRead", () => {
-    const orderId = 42;
-
     it("returns null for an empty result rather than throwing", async () => {
       const stubServer = {
         simulateTransaction: vi.fn().mockResolved({
@@ -172,16 +170,17 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
         stubServer as never,
         dummyAccount,
         contractId,
-        "get_order",
-        [xdr.ScVal.scvUy64(BigInt(orderId))]
+        "test_func",
+        dummyArgs
       );
 
       expect(result).toBeNull();
+      expect(stubServer.simulateTransaction).toHaveBeenCalledTimes(1);
     });
 
     it("propagates a thrown simulation error as an error", async () => {
       const stubServer = {
-        simulateTransaction: vi.fn().mockRejected(new Error("RPC simulation failed")),
+        simulateTransaction: vi.fn().mockRejected(new Error("Simulation failed")),
       };
 
       await expect(
@@ -189,10 +188,10 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
           stubServer as never,
           dummyAccount,
           contractId,
-          "get_order",
-          [xdr.ScVal.scvUy64(BigInt(orderId))]
+          "test_func",
+          dummyArgs
         )
-      ).rejects.toThrow("RPC simulation failed");
+      ).rejects.toThrow("Simulation failed");
     });
   });
 });

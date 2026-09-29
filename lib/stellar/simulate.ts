@@ -82,10 +82,10 @@ export function buildInvocationTransaction(
  * address with no entry) resolve to `null` instead of throwing, mirroring how
  * the contract treats "missing" as zero/absent.
  *
- * "Absent" (an empty result or a simulation error) is reported as `null` so
- * callers can distinguish it from a thrown error. Errors thrown by the RPC
- * itself (network failures, malformed responses) still propagate to the
- * caller as exceptions.
+ * A simulation error (HostError, invalid wasm, etc.) is treated as "absent"
+ * and resolves to `null`; callers distinguish this from a thrown transport
+ * error, which still propagates. An empty result (no retval) also resolves
+ * to `null` so callers can branch on "absent" vs "failed".
  */
 export async function simulateContractRead(
   server: rpc.Server,
