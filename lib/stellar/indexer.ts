@@ -8,14 +8,14 @@ import {
 } from "./config";
 import { scValToString } from "./scval";
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Real-time event indexer.
 //
 // Polls `getEvents` (cursor-paginated) for the checkout contract and decodes
 // the contract's events (`pay`, `create_order`, `dispatch`, `refund`) so the
 // UI can update instantly when a payment lands. Uses a ledger backfill on
 // first connect, then advances by cursor so nothing is missed between polls.
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 export interface IndexedEvent {
   id: string;
@@ -193,8 +193,8 @@ export class PaymentEventIndexer {
 
   /**
    * Resume polling and run one catch-up tick immediately. The cursor is kept
-   * across the pause, so the catch-up reads every event that landed while the
-   * tab was hidden — nothing is skipped.
+   * across the pause, so the catch-up reads every event that landed while
+   * the tab was hidden — nothing is skipped.
    */
   private resume(callbacks: IndexerCallbacks): void {
     if (!this.paused) return;
@@ -236,8 +236,6 @@ export class PaymentEventIndexer {
       this.latestLedger = res.latestLedger;
       this.lastError = undefined;
 
-      // A successful poll means the window is settled: drop the backfill
-      // start ledger so subsequent polls advance by cursor only.
       if (this.startLedger !== undefined) {
         this.startLedger = undefined;
       }
@@ -284,9 +282,6 @@ export class PaymentEventIndexer {
   /**
    * If the requested start ledger predates the RPC's retention window, roll
    * the window forward toward the tip so the next poll can proceed.
-   *
-   * Only applies while a backfill window is active; once the indexer has
-   * settled onto a cursor a retention error must not silently move it.
    */
   private recoverFromRetentionError(): void {
     if (this.startLedger !== undefined && this.latestLedger !== undefined) {
