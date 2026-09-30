@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   mergeOrderEvent,
   mergeOrderEvents,
+  eventToOrder,
   OrderEvent,
 } from "../../../lib/stellar/orders";
 
@@ -143,5 +144,59 @@ describe("mergeOrderEvent", () => {
 
   it("exports mergeOrderEvents alias that functions identically", () => {
     expect(mergeOrderEvents).toBe(mergeOrderEvent);
+  });
+});
+
+describe("eventToOrder topic mapping", () => {
+  // Topic layouts declared in contracts/checkout/src/events.rs:
+  //   create_order: (symbol_short!("create_order"), order_id, buyer, token, amount)
+  //   pay:          (symbol_short!("pay"), order_id, buyer, token, amount)
+  //   dispatch:     (symbol_short!("dispatch"), order_id, merchant)
+  //   refund:       (symbol_short!("refund"), order_id, buyer, token, amount)
+  const ORDER_ID = "order_1234567890abcdef";
+  const BUYER = "GBUYER1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCD";
+  const MERCHANT = "GMERCHANT1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890AB";
+  const TOKEN = "CUSDC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCD";
+
+  it("maps create_order using topic1 as order id (not topic0)", () => {
+    const topics = ["create_order", ORDER_ID, BUYER, TOKEN, "45.00"];
+    const order = eventToOrder(topics, 1700000000000, 1000, "tx_create");
+    expect(order.orderId).toBe(ORDER_ID);
+    expect(order.buyer).toBe(BUYER);
+    expect(order.amount).toBe("45.00");
+    expect(order.status).toBe("Pending");
+  });
+
+  it("maps pay using topic1 as order id and topic2 as buyer", () => {
+    const topics = ["pay", ORDER_ID, BUYER, TOKEN, "45.00"];
+    const order = eventToOrder(topics, 1700000010000, 1001, "tx_pay");
+    expect(order.orderId).toBe(ORDER_ID);
+    expect(order.buyer).toBe(BUYER);
+    expect(order.amount).toBe("45.00");
+    expect(order.status).toBe("Paid");
+  });
+
+  it("maps dispatch using topic1 as order id and topic2 as merchant", () => {
+    const topics = ["dispatch", ORDER_ID, MERCHANT];
+    const order = eventToOrder(topics, 1700000020000, 1002, "tx_dispatch");
+    expect(order.orderId).toBe(ORDER_ID);
+    expect(order.buyer).toBe(MERCHANT);
+    expect(order.status).toBe("Shipped");
+  });
+
+  it("maps refund using topic1 as order id and topic2 as buyer", () => {
+    const topics = ["refund", ORDER_ID, BUYER, TOKEN, "45.00"];
+    const order = eventToOrder(topics, 1700000030000, 1003, "tx_refund");
+    expect(order.orderId).toBe(ORDER_ID);
+    expect(order.buyer).toBe(BUYER);
+    expect(order.amount).toBe("45.00");
+    expect(order.status).toBe("Refunded");
+  });
+
+  it("fails if topic0 (event name) is used as the order id", () => {
+    const topics = ["pay", ORDER_ID, BUYER, TOKEN, "45.00"];
+    const order = eventToOrder(topics, 1700000010000, 1001, "tx_pay");
+    expect(order.orderId).not.toBe("pay");
+    expect(order.orderId).toBe(ORDER_ID);
   });
 });
