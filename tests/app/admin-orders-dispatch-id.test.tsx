@@ -49,6 +49,8 @@ vi.mock("../../lib/stellar/indexer", () => ({
 vi.mock("../../lib/stellar/config", () => ({
   NETWORK: "testnet",
   CHECKOUT_CONTRACT_ID: "C".repeat(56),
+  CHECKOUT_START_LEDGER: 0,
+  ADMIN_ORDERS_CURSOR_STORAGE_KEY: "mova:admin-orders:cursor:v1",
 }));
 
 vi.mock("../../components/AdminGuard", () => ({

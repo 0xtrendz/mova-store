@@ -120,8 +120,27 @@ export const FRIENDBOT_URL = "https://friendbot.stellar.org";
 
 // Event indexing (lib/stellar/indexer.ts).
 export const EVENT_POLL_INTERVAL_MS = 4000;
-// How many ledgers behind the tip to start scanning on first connect.
+// How many ledgers behind the tip to start scanning on first connect. This is a
+// rolling window: fine for a live confirmation watch, but an operations view
+// that must show older history needs a durable start ledger instead (see
+// CHECKOUT_START_LEDGER below).
 export const EVENT_START_LEDGER_BACKFILL = 100;
+
+// Durable start ledger for history-sensitive views (the admin orders table).
+//
+// Set `NEXT_PUBLIC_CHECKOUT_START_LEDGER` to the ledger the checkout contract
+// was deployed in so the admin scan reaches orders paid before the rolling
+// backfill window. A value of 0 (or unset) keeps the rolling backfill, i.e.
+// today's behaviour.
+const parsedCheckoutStartLedger = Number(process.env.NEXT_PUBLIC_CHECKOUT_START_LEDGER);
+export const CHECKOUT_START_LEDGER =
+  Number.isFinite(parsedCheckoutStartLedger) && parsedCheckoutStartLedger > 0
+    ? Math.floor(parsedCheckoutStartLedger)
+    : 0;
+
+// localStorage key under which the admin orders indexer persists its resume
+// cursor, so a reload continues the scan instead of restarting the window.
+export const ADMIN_ORDERS_CURSOR_STORAGE_KEY = "mova:admin-orders:cursor:v1";
 
 // Pre-flight simulation (lib/stellar/simulate.ts).
 // Safety buffer added on top of the simulated resource fee so the tx has

@@ -757,3 +757,146 @@ describe("PaymentEventIndexer overlapping-poll guard (Issue #632)", () => {
     expect(calls).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("PaymentEventIndexer durable start ledger & persisted cursor (Issue #715)", () => {
+  const STORAGE_KEY = "mova:test:admin-orders:cursor";
+
+  // Node's jsdom environment does not expose `window.localStorage` without a
+  // backing file, so install a minimal in-memory Storage for these tests.
+  function installMemoryStorage() {
+    const map = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => (map.has(key) ? (map.get(key) as string) : null),
+      setItem: (key: string, value: string) => void map.set(key, String(value)),
+      removeItem: (key: string) => void map.delete(key),
+      clear: () => map.clear(),
+      key: (index: number) => Array.from(map.keys())[index] ?? null,
+      get length() {
+        return map.size;
+      },
+    };
+    Object.defineProperty(window, "localStorage", {
+      value: storage,
+      configurable: true,
+      writable: true,
+    });
+    return storage;
+  }
+
+  function fakeServer(sequence: number, cursor: string) {
+    return {
+      getLatestLedger: vi.fn().mockResolvedValue({ sequence }),
+      getEvents: vi.fn().mockResolvedValue({ latestLedger: sequence, cursor, events: [] }),
+    };
+  }
+
+  beforeEach(() => {
+    installMemoryStorage();
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("scans from a configured durable start ledger instead of the rolling backfill window", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const server = {
+      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 10_000 }),
+      getEvents: vi.fn().mockImplementation(async (args: Record<string, unknown>) => {
+        calls.push(args);
+        return { latestLedger: 10_000, cursor: "cursor-durable", events: [] };
+      }),
+    };
+    const indexer = new PaymentEventIndexer({ startLedger: 5_000, pollMs: 20 });
+    (indexer as unknown as { server: unknown }).server = server;
+
+    indexer.start({ onEvent: () => {} });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    indexer.stop();
+
+    expect(calls[0]).toMatchObject({ startLedger: 5_000 });
+    expect(calls[0].cursor).toBeUndefined();
+  });
+
+  it("falls back to the rolling backfill when no durable start ledger is configured", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const server = {
+      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 1_000 }),
+      getEvents: vi.fn().mockImplementation(async (args: Record<string, unknown>) => {
+        calls.push(args);
+        return { latestLedger: 1_000, cursor: "c", events: [] };
+      }),
+    };
+    const indexer = new PaymentEventIndexer({ pollMs: 20 });
+    (indexer as unknown as { server: unknown }).server = server;
+
+    indexer.start({ onEvent: () => {} });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    indexer.stop();
+
+    expect(calls[0].startLedger).toBe(900);
+  });
+
+  it("persists the cursor and resumes from it on a later load", async () => {
+    const first = new PaymentEventIndexer({
+      startLedger: 5_000,
+      cursorStorageKey: STORAGE_KEY,
+      pollMs: 20,
+    });
+    (first as unknown as { server: unknown }).server = fakeServer(9_000, "cursor-persisted");
+    first.start({ onEvent: () => {} });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    first.stop();
+
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe("cursor-persisted");
+
+    const secondCalls: Array<Record<string, unknown>> = [];
+    const second = new PaymentEventIndexer({
+      startLedger: 5_000,
+      cursorStorageKey: STORAGE_KEY,
+      pollMs: 20,
+    });
+    (second as unknown as { server: unknown }).server = {
+      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 9_001 }),
+      getEvents: vi.fn().mockImplementation(async (args: Record<string, unknown>) => {
+        secondCalls.push(args);
+        return { latestLedger: 9_001, cursor: "cursor-next", events: [] };
+      }),
+    };
+    second.start({ onEvent: () => {} });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    second.stop();
+
+    expect(secondCalls[0]).toMatchObject({ cursor: "cursor-persisted" });
+    expect(secondCalls[0].startLedger).toBeUndefined();
+  });
+
+  it("drops a persisted cursor that outlived RPC retention and re-derives the durable window", async () => {
+    window.localStorage.setItem(STORAGE_KEY, "stale-cursor");
+    const calls: Array<Record<string, unknown>> = [];
+    const server = {
+      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 20_000 }),
+      getEvents: vi.fn().mockImplementation(async (args: Record<string, unknown>) => {
+        calls.push(args);
+        if (args.cursor === "stale-cursor") {
+          throw new Error("cursor is outside the retention window");
+        }
+        return { latestLedger: 20_000, cursor: "cursor-fresh", events: [] };
+      }),
+    };
+    const indexer = new PaymentEventIndexer({
+      startLedger: 12_000,
+      cursorStorageKey: STORAGE_KEY,
+      pollMs: 20,
+    });
+    (indexer as unknown as { server: unknown }).server = server;
+
+    indexer.start({ onEvent: () => {} });
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    indexer.stop();
+
+    expect(calls.some((c) => c.cursor === "stale-cursor")).toBe(true);
+    expect(calls.some((c) => c.startLedger === 12_000)).toBe(true);
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe("cursor-fresh");
+  });
+});

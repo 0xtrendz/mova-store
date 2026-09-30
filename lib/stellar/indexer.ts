@@ -51,11 +51,24 @@ export interface IndexerCallbacks {
 
 const RETENTION_RETRY_LEDGER_DELTA = 5;
 
+/**
+ * Whether an RPC error means the requested position fell outside the retained
+ * event window (as opposed to a transient network/transport failure).
+ */
+function isRetentionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /retention|too old|older than|ledger range|out of range/i.test(message);
+}
+
 export class PaymentEventIndexer {
   private readonly server: rpc.Server;
   private readonly contractId: string;
   private readonly pollMs: number;
   private readonly watchedSymbols: string[];
+  /** Durable start ledger for history-sensitive views; `undefined` keeps the rolling backfill. */
+  private readonly durableStartLedger: number | undefined;
+  /** When set, the resume cursor is persisted here so a reload continues the scan. */
+  private readonly cursorStorageKey: string | undefined;
 
   private cursor: string | undefined;
   private startLedger: number | undefined;
@@ -81,12 +94,17 @@ export class PaymentEventIndexer {
       contractId?: string;
       pollMs?: number;
       watchedSymbols?: string[];
+      startLedger?: number;
+      cursorStorageKey?: string;
     } = {}
   ) {
     this.server = new rpc.Server(opts.rpcUrl ?? RPC_URL);
     this.contractId = opts.contractId ?? CHECKOUT_CONTRACT_ID;
     this.pollMs = opts.pollMs ?? EVENT_POLL_INTERVAL_MS;
     this.watchedSymbols = opts.watchedSymbols ?? ["pay", "create_order", "dispatch", "refund"];
+    this.durableStartLedger =
+      opts.startLedger !== undefined && opts.startLedger > 0 ? opts.startLedger : undefined;
+    this.cursorStorageKey = opts.cursorStorageKey;
   }
 
   get status(): IndexerStatus {
@@ -213,7 +231,14 @@ export class PaymentEventIndexer {
     try {
       const latest = await this.server.getLatestLedger();
       this.latestLedger = latest.sequence;
-      this.startLedger = Math.max(1, this.latestLedger - EVENT_START_LEDGER_BACKFILL);
+      const persistedCursor = this.readPersistedCursor();
+      if (persistedCursor) {
+        // Resume the position persisted by a previous visit instead of
+        // re-walking the backfill window from scratch.
+        this.cursor = persistedCursor;
+      } else {
+        this.startLedger = this.resolveStartLedger();
+      }
       this.initialized = true;
       this.lastError = undefined;
       callbacks.onStatus?.(this.status);
@@ -228,9 +253,51 @@ export class PaymentEventIndexer {
     }
   }
 
+  /**
+   * The ledger a fresh scan starts from. A configured durable start ledger wins
+   * over the rolling backfill window, so a history-sensitive view can reach
+   * orders older than `EVENT_START_LEDGER_BACKFILL`.
+   */
+  private resolveStartLedger(): number {
+    if (this.durableStartLedger !== undefined) {
+      return this.durableStartLedger;
+    }
+    if (this.latestLedger !== undefined) {
+      return Math.max(1, this.latestLedger - EVENT_START_LEDGER_BACKFILL);
+    }
+    return 1;
+  }
+
+  private readPersistedCursor(): string | undefined {
+    if (!this.cursorStorageKey || typeof window === "undefined") return undefined;
+    try {
+      return window.localStorage.getItem(this.cursorStorageKey) ?? undefined;
+    } catch {
+      // A disabled or full localStorage must not stop the scan.
+      return undefined;
+    }
+  }
+
+  private persistCursor(): void {
+    if (!this.cursorStorageKey || !this.cursor || typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(this.cursorStorageKey, this.cursor);
+    } catch {
+      // Best-effort: an unwritable store just means the next load re-scans.
+    }
+  }
+
+  private clearPersistedCursor(): void {
+    if (!this.cursorStorageKey || typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(this.cursorStorageKey);
+    } catch {
+      // Best-effort.
+    }
+  }
+
   private async poll(callbacks: IndexerCallbacks): Promise<void> {
     if (!this.running || !this.initialized) return;
-
     try {
       const res = await this.fetchEvents();
       this.latestLedger = res.latestLedger;
@@ -241,6 +308,7 @@ export class PaymentEventIndexer {
       }
       if (res.cursor) {
         this.cursor = res.cursor;
+        this.persistCursor();
       }
 
       for (const raw of res.events) {
@@ -263,7 +331,7 @@ export class PaymentEventIndexer {
     } catch (err) {
       this.lastError = String(err instanceof Error ? err.message : err);
       callbacks.onError?.(new Error(`getEvents failed: ${this.lastError}`));
-      this.recoverFromRetentionError();
+      this.recoverFromRetentionError(err);
       callbacks.onStatus?.(this.status);
     }
   }
@@ -280,15 +348,25 @@ export class PaymentEventIndexer {
   }
 
   /**
-   * If the requested start ledger predates the RPC's retention window, roll
-   * the window forward toward the tip so the next poll can proceed.
+   * Keep the scan recoverable. A start ledger that predates the RPC's
+   * retention window is rolled forward toward the tip. A persisted cursor can
+   * outlive retention for the same reason, so on a retention error it is
+   * dropped and the window is re-derived — a view must not get permanently
+   * stuck on a stale resume point.
    */
-  private recoverFromRetentionError(): void {
+  private recoverFromRetentionError(error?: unknown): void {
     if (this.startLedger !== undefined && this.latestLedger !== undefined) {
       this.startLedger = Math.max(
         this.startLedger,
         this.latestLedger - RETENTION_RETRY_LEDGER_DELTA
       );
+      return;
+    }
+
+    if (this.cursor !== undefined && isRetentionError(error)) {
+      this.cursor = undefined;
+      this.clearPersistedCursor();
+      this.startLedger = this.resolveStartLedger();
     }
   }
 
