@@ -21,10 +21,14 @@ export default function OrderCard({ order }: OrderCardProps) {
     onChainStatus?: string;
   } | null>(null);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(order.orderId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(order.orderId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
   };
 
   const handleVerify = async () => {
