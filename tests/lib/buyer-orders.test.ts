@@ -54,6 +54,9 @@ describe("Buyer Orders Management", () => {
     items: [{ name: "Running Shoes", price: 89.99, quantity: 1 }],
   };
 
+  const OWNER_ADDRESS = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4AT4AQH3ZLLFA5";
+  const OTHER_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
@@ -164,10 +167,10 @@ describe("Buyer Orders Management", () => {
   });
 
   it("verifies order on-chain via readOrder", async () => {
-    vi.spyOn(stellarOrders, "readOrder").mockResolvedValueOnce({
+    vi.spyOn(stellarOrders, "readOrder").mockResolvedOnce({
       orderId: "SS-101",
       orderIdHash: "010203",
-      buyer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+      buyer: OWNER_ADDRESS,
       amount: BigInt(899900000),
       amountDisplay: "89.99",
       token: "C...",
@@ -177,13 +180,62 @@ describe("Buyer Orders Management", () => {
     });
 
     const verification = await verifyOrderOnChain("SS-101");
-    expect(verification.verified).toBe(true);
+    expect(verification.verified).toBe((true));
     expect(verification.onChainStatus).toBe("Paid");
   });
 
   it("returns verified false when on-chain order is not found or Unknown", async () => {
-    vi.spyOn(stellarOrders, "readOrder").mockResolvedValueOnce(null);
+    vi.spyOn(stellarOrders, "readOrder").mockResolvedOnce(null);
     const verification = await verifyOrderOnChain("UNKNOWN-1");
     expect(verification.verified).toBe(false);
   });
-});
+
+  describe("verifyOrderOnChain ownership", () => {
+    it("reports a matching buyer as verified and returns their address", async () => {
+      vi.spyOn(stellarOrders, "readOrder").mockResolvedOnce({
+        orderId: "SS-101",
+        orderIdHash: "010203",
+        buyer: OWNER_ADDRESS,
+        amount: BigInt(899900000),
+        amountDisplay: "89.99",
+        token: "C...",
+        tokenSymbol: "USDC",
+        timestamp: 1725523200,
+        status: "Paid",
+      });
+
+      const verification = await verifyOrderOnChain("SS-101", OWNER_ADDRESS);
+
+      expect(verification.verified).toBe(true);
+      expect(verification.buyer).toBe(OWNER_ADDRESS);
+    });
+
+    it("reports a mismatched buyer as not verified and returns the on-chain buyer", async () => {
+      vi.spyOn(stellarOrders, "readOrder").mockResolvedOnce({
+        orderId: "SS-101",
+        orderIdHash: "010203",
+        buyer: OWNER_ADDRESS,
+        amount: BigInt(899900000),
+        amountDisplay: "89.99",
+        token: "C...",
+        tokenSymbol: "USDC",
+        timestamp: 1725523200,
+        status: "Paid",
+      });
+
+      const verification = await verifyOrderOnChain("SS-101", OTHER_ADDRESS);
+
+      expect(verification.verified).toBe(false);
+      expect(verification.buyer).toBe(OWNER_ADDRESS);
+    });
+
+    it("reports an absent order as not verified", async () => {
+      vi.spyOn(stellarOrders, "readOrder").mockResolvedOnce(null);
+
+      const verification = await verifyOrderOnChain("SS-MISSING", OWNER_ADDRESS);
+
+      expect(verification.verified).toBe(false);
+      expect(verification.buyer).toBeUndefined();
+    });
+  });
+})
