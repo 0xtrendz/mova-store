@@ -65,6 +65,7 @@ const AddProductForm = ({ onProductAdded }) => {
           <input
             id="add-product-price"
             type="number"
+            min="0"
             step="0.01"
             className="w-full p-3 mt-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
             value={productPrice}
