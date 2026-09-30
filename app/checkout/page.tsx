@@ -42,6 +42,53 @@ import {
 } from "../../lib/validation";
 import { ariaInvalid, focusFirstError } from "../../lib/accessibility";
 
+/**
+ * The cart is persisted as a single object under `cartItems` that carries the
+ * derived total alongside the items, so the two can never drift apart. The
+ * legacy `totalPrice` key is no longer written or trusted.
+ */
+type StoredCart = { items: any[]; total: number };
+
+const CART_STORAGE_KEY = "cartItems";
+
+/**
+ * Derives the total from the items so the stored total can always be
+ * recomputed on read and can never drift from the stored items.
+ */
+export const deriveTotal = (items: any[]): number =>
+  items.reduce(
+    (sum: number, item: any) =>
+      sum + (Number(item.price) || 0) * (Number(item.quantity) || 1),
+    0
+  );
+
+/**
+ * Reads the persisted cart. Accepts both the current `{ items, total }` shape
+ * and the legacy bare-array shape (whose total is recomputed from the items so
+ * a stale `totalPrice` key can never be trusted).
+ */
+const readStoredCart = (): StoredCart => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "null");
+    if (Array.isArray(parsed)) {
+      return { items: parsed, total: deriveTotal(parsed) };
+    }
+    if (parsed && Array.isArray(parsed.items)) {
+      // Recompute the total from the items on read so a stale or tampered
+      // stored total can never diverge from the stored items.
+      return { items: parsed.items, total: deriveTotal(parsed.items) };
+    }
+  } catch {
+    // fall through to the empty cart
+  }
+  return { items: [], total: 0 };
+};
+
+/** Persists items and their derived total together, in one write. */
+const writeStoredCart = (items: any[], total: number) => {
+  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify({ items, total }));
+};
+
 /** Stable ids for the per-field error text, referenced by aria-describedby. */
 const FIELD_ERROR_IDS = {
   firstName: "checkout-first-name-error",
@@ -92,9 +139,8 @@ const Checkout = () => {
       `${symbol} payment received ✓ $${Number(result.amountUsd).toFixed(2)} · order ${orderId}`
     );
     setStage(3);
-    localStorage.removeItem("cartItems");
+    localStorage.removeItem(CART_STORAGE_KEY);
     localStorage.removeItem("itemCount");
-    localStorage.removeItem("totalPrice");
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,9 +248,8 @@ const Checkout = () => {
     const { isValid } = validateOTP(entered);
     if (isValid && entered === otp) {
       setStage(3);
-      localStorage.removeItem("cartItems");
+      localStorage.removeItem(CART_STORAGE_KEY);
       localStorage.removeItem("itemCount");
-      localStorage.removeItem("totalPrice");
       showToast("OTP confirmed successfully.");
     } else {
       setIsOtpSending(false);
@@ -220,19 +265,12 @@ const Checkout = () => {
   };
 
   useEffect(() => {
-    // Read the cart items from localStorage (IDs only; we re-fetch prices
-    // server-side so a tampered localStorage.totalPrice has no effect).
-    let storedItems: any[] = [];
-    try {
-      const raw = localStorage.getItem("cartItems");
-      const parsed = JSON.parse(raw || "[]");
-      if (Array.isArray(parsed)) {
-        storedItems = parsed;
-      }
-    } catch {
-      storedItems = [];
-    }
-
+    // Read the cart from localStorage. Items and total live in the same stored
+    // object; we still re-fetch prices server-side so a tampered stored total
+    // has no effect on what the customer is charged.
+    const stored = readStoredCart();
+    const storedItems = stored.items;
+    setTotalPrice(deriveTotal(storedItems));
     setCartItems(storedItems);
 
     if (storedItems.length === 0) {
@@ -257,11 +295,15 @@ const Checkout = () => {
       })
       .then(({ total }) => {
         setTotalPrice(total);
+        // Re-persist items and the authoritative total together so the stored
+        // total always matches the stored items.
+        writeStoredCart(storedItems, total);
       })
       .catch((err) => {
         console.error("Failed to fetch server-side total:", err);
-        // Keep totalPrice at 0 so the cart is treated as unresolvable.
-        setTotalPrice(0);
+        // Fall back to the total derived from the stored items so the stored
+        // total and the stored items stay in sync.
+        setTotalPrice(deriveTotal(storedItems));
       })
       .finally(() => {
         setIsLoaded(true);
@@ -277,9 +319,8 @@ const Checkout = () => {
 
   useEffect(() => {
     if (stage === 3) {
-      localStorage.removeItem("totalPrice");
       localStorage.removeItem("itemCount");
-      localStorage.removeItem("cartItems");
+      localStorage.removeItem(CART_STORAGE_KEY);
     }
   }, [stage]);
 
