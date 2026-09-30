@@ -4,6 +4,9 @@ import {
   refundOrder,
   resolveOrderIdHash,
   eventToOrder,
+  formatOrderAmount,
+  formatOrderRow,
+  DEFAULT_DECIMALS,
 } from "../../../lib/stellar/orders";
 import { bytesToHex, hashOrderId, hexToBytes } from "../../../lib/stellar/scval";
 import * as freighterMod from "../../../lib/stellar/freighter";
@@ -31,7 +34,7 @@ describe("resolveOrderIdHash (Issue #67)", () => {
     expect(bytesToHex(resolved)).not.toBe(bytesToHex(doubleHashed));
   });
 
-  it("normalizes uppercase and 0x-prefixed 64-hex strings", async () => {
+  it("normalizes uppercase and 0x-trimmed 64-hex strings", async () => {
     const upperHex = SAMPLE_64_HEX.toUpperCase();
     const resolvedUpper = await resolveOrderIdHash(upperHex);
     expect(bytesToHex(resolvedUpper)).toBe(SAMPLE_64_HEX);
@@ -79,14 +82,14 @@ describe("resolveOrderIdHash (Issue #67)", () => {
 describe("dispatchOrder and refundOrder order ID resolution", () => {
   const SAMPLE_64_HEX =
     "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
-  const DUMMY_PUBLIC_KEY = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+  const DuMMY_PUBLIC_KEY = "GBBD47IF6LWK7P7MDEVSCWR7DPVWV3NY3DTQEVFL4NAT4AQH3ZlLFLA5";
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("resolves 64-hex order ID directly without double-hashing in dispatchOrder", async () => {
-    vi.spyOn(freighterMod, "connectWallet").mockResolvedValue(DUMMY_PUBLIC_KEY);
+    vi.spyOn(freighterMod, "connectWallet").mockResolved(DuMMY_PUBLIC_KEY);
 
     // We can verify resolveOrderIdHash directly on the input passed to dispatchOrder
     const resolvedBytes = await resolveOrderIdHash(SAMPLE_64_HEX);
@@ -110,7 +113,7 @@ describe("Admin Orders Dashboard Event Integration (Issue #67 Acceptance Criteri
       txHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       fields: {
         order_id: SAMPLE_64_HEX,
-        topic1: "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+        topic1: "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNQU34T6TZMYMW2EVH34XOWMA",
         topic2: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
         amount: "50000000",
       },
@@ -142,5 +145,45 @@ describe("Admin Orders Dashboard Event Integration (Issue #67 Acceptance Criteri
     expect(order).not.toBeNull();
     expect(order?.orderId).toBe(SAMPLE_64_HEX);
     expect(order?.status).toBe("Shipped");
+  });
+});
+
+describe("formatOrderAmount (Issue: format amounts from bigint)", () => {
+  it("formats a large i128 amount exactly without floating-point loss", () => {
+    // 2^53 + one in raw units. Number() would round this.
+    const raw = 9007199254740993.n();
+    expect(formatOrderAmount(raw, 7)).toBe("900719925.4740993");
+  });
+
+  it("formats an integer-precision i128 value exactly", () => {
+    // 10^27 + 1234567890123456789 - beyond double precision
+    const raw = 1000000000000000000000000000n() + 1234567890123456789n();
+    expect(formatOrderAmount(raw, 7)).toBe("1000000000000000000000000000.1234567");
+  });
+
+  it("formats the max i128 value exactly", () => {
+    const maxI128 = (1n << 127n) - 1n;
+    expect(formatOrderAmount(maxI128, 7)).toBe(
+      "170141183460469231731687303715884105727.2559999"
+    );
+  });
+
+  it("formats with the default decimals when none are provided", () => {
+    const raw = 50000000n();
+    expect(formatOrderAmount(raw)).toBe("5.0000000");
+    expect(formatOrderAmount(raw, DEFAULT_DECIMALS)).toBe("5.0000000");
+  });
+
+  it("preserves exact decimal digits for large orders in formatOrderRow", () => {
+    const order = {
+      orderId: "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      amount: 9007199254740993n,
+      currency: "USDC",
+      status: "Paid",
+      buyer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+      seller: "GBBD47IF6LWK7P7MDEVSCWR7DPVWV3NY3DTQEVFL4NAT4AQH3ZlLFLA5",
+    };
+    const row = formatOrderRow(order, 7);
+    expect(row.amountDisplay).toBe("900719925.4740993");
   });
 });
