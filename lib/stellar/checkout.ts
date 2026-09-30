@@ -48,8 +48,26 @@ export interface PayResult {
   };
 }
 
+/**
+ * Whether the opt-in Stellar debug logging is enabled.
+ *
+ * Logging is off unless the caller explicitly sets
+ * `NEXT_PUBLIC_STELLAR_DEBUG` to `"1"` or `"true"`, so production payments
+ * never write internal state to the browser console. See issue #718.
+ */
+function isStellarDebugEnabled(): boolean {
+  const flag = process.env.NEXT_PUBLIC_STELLAR_DEBUG;
+  return flag === "1" || flag === "true";
+}
+
+/**
+ * Default progress sink used when the caller does not pass `onStatus`.
+ * Silent unless debug logging is explicitly enabled.
+ */
 function status(s: string): void {
-  console.log(`[stellar] ${s}`);
+  if (isStellarDebugEnabled()) {
+    console.log(`[stellar] ${s}`);
+  }
 }
 
 /**
