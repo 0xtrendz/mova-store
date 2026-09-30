@@ -140,4 +140,37 @@ describe("StellarOrderWatch Component", () => {
     expect(screen.getByText("CA7TOKENADDRESS")).toBeInTheDocument();
     expect(screen.getByText("0xabc123txhash456789")).toBeInTheDocument();
   });
+
+  it("invokes the latest onEvent prop after it changes while listening (#717)", async () => {
+    const orderId = "order-swap-717";
+    const first = vi.fn();
+    const second = vi.fn();
+    const { rerender } = render(<StellarOrderWatch orderId={orderId} onEvent={first} />);
+
+    await vi.waitFor(() => {
+      expect(mockStart).toHaveBeenCalled();
+    });
+    expect(mockStart).toHaveBeenCalledTimes(1);
+
+    // A new callback must not restart the running indexer…
+    await act(async () => {
+      rerender(<StellarOrderWatch orderId={orderId} onEvent={second} />);
+    });
+    expect(mockStart).toHaveBeenCalledTimes(1);
+
+    const expectedHex = bytesToHex(await hashOrderId(orderId)).toLowerCase();
+    act(() => {
+      lastIndexerCallbacks.onEvent({
+        id: "ev-717",
+        ledger: 42,
+        txHash: "0x717tx",
+        symbol: "pay",
+        fields: { topic1: "CTOKEN", topic4: expectedHex, amount: "1.00 USDC" },
+      });
+    });
+
+    // …but the current one is the callback that fires.
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+  });
 });
