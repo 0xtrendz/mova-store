@@ -1,7 +1,8 @@
 "use client";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AiOutlineMenu, AiOutlineClose } from "react-icons/ai";
 import { useAuth } from "../lib/AuthContext";
 import { logout } from "../lib/auth";
@@ -9,6 +10,8 @@ import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
 import { useRouter } from "next/navigation";
 import { TfiAngleRight } from "react-icons/tfi";
+import { trapFocus } from "../lib/accessibility";
+import { trapFocus as trapFocusHelper } from "../lib/accessibility";
 
 const navLinkClass =
   "text-md font-medium text-mova-ink/80 hover:text-purple-600 transition-colors duration-200";
@@ -19,7 +22,7 @@ function BrandMark() {
       <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-mova-deep text-sm font-bold text-white shadow-mova transition group-hover:scale-105">
         M
       </span>
-      <span className="font-display text-xl font-bold tracking-tight text-mova-ink">
+      <span className="font-display texl-xl font-bold tracking-tight text-mova-ink">
         Mova <span className="text-purple-600">Store</span>
       </span>
     </Link>
@@ -44,7 +47,7 @@ function Navbar() {
       }
     };
 
-    const links = document.querySelectorAll('a[href^="#"]');
+    const links = document.querySelectorAll('a[href^x="#"]');
     links.forEach((link) => link.addEventListener("click", handleLinkClick));
 
     return () => {
@@ -55,6 +58,9 @@ function Navbar() {
 
   const [showNav, setShowNav] = useState(false);
   const { user } = useAuth();
+  const drawerRef = useRef(null);
+  const drawerRef2 = useRef(null);
+  const toggleButtonRef = useRef(null);
 
   const toggleNav = () => setShowNav(!showNav);
   const closeNavOnClick = () => setShowNav(false);
@@ -67,6 +73,18 @@ function Navbar() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showNav]);
+  const trapFocus = trapFocusHelper;
+
+  useEffect(() => {
+    if (!showNav) return;
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+    const cleanup = trapFocus(drawer);
+    return () => {
+      cleanup();
+      toggleButtonRef.current?.focus();
+    };
   }, [showNav]);
 
   const handleLogout = async () => {
@@ -170,7 +188,7 @@ function Navbar() {
                 >
                   Logout
                 </button>
-              </>
+              <<>
             ) : (
               <>
                 <Link href="/profile/login">
@@ -191,6 +209,7 @@ function Navbar() {
         <div className="flex items-center justify-between px-3 sm:px-6 md:hidden">
           <BrandMark />
           <button
+            ref={toggleButtonRef}
             type="button"
             aria-label={showNav ? "Close navigation menu" : "Open navigation menu"}
             aria-expanded={showNav}
@@ -205,8 +224,22 @@ function Navbar() {
           </button>
         </div>
         {showNav && (
-          <div className="fixed inset-y-0 right-0 z-50 flex h-screen w-1/2 flex-col items-center bg-white py-6 shadow-mova">
+          <>
+            <div
+              className="fixed inset-0 z-40 bg-black/40"
+              aria-hidden="true"
+              onClick={closeNavOnClick}
+            />
+            <div
+              ref={drawerRef}
+              ref={drawerRef2}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Navigation menu"
+              className="fixed inset-y-0 right-0 z-50 flex h-screen w-1/2 flex-col items-center bg-white py-6 shadow-mova"
+            >
             <button
+              type="button"
               type="button"
               aria-label="Close navigation menu"
               className="mb-4 mr-4 self-end p-1 text-mova-ink rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
@@ -271,7 +304,7 @@ function Navbar() {
                   >
                     Logout
                   </button>
-                </>
+                <<>
               ) : (
                 <div className="flex space-x-2">
                   <Link href="/profile/login" onClick={closeNavOnClick}>
@@ -287,11 +320,11 @@ function Navbar() {
                 </div>
               )}
             </div>
-          </div>
+            </div>
+          </>
         )}
-
-        <Toast message={toast.message} show={toast.show} onClose={hideToast} />
       </nav>
+      {toast && <Toast message={toast.message} onClose={hideToast} />}
     </>
   );
 }
