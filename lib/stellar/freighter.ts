@@ -4,6 +4,7 @@ import {
   isConnected,
   requestAccess,
   signTransaction,
+  WatchWalletChanges,
 } from "@stellar/freighter-api";
 
 import { NETWORK, NETWORK_PASSPHRASE } from "./config";
@@ -50,6 +51,22 @@ export async function currentAddress(): Promise<string | null> {
   const res = await getAddress();
   if (res.error || !res.address) return null;
   return res.address;
+}
+
+/**
+ * Subscribe to Freighter account/network changes so callers can invalidate a
+ * cached address as soon as the user switches accounts or disconnects.
+ * Returns an unsubscribe function that stops the underlying watcher.
+ */
+export function watchWalletChanges(
+  onChange: (info: { address: string; network: string }) => void,
+  timeout = 3000
+): () => void {
+  const watcher = new WatchWalletChanges(timeout);
+  watcher.watch((params) => {
+    onChange({ address: params.address ?? "", network: params.network ?? "" });
+  });
+  return () => watcher.stop();
 }
 
 export async function ensureNetwork(): Promise<string> {
