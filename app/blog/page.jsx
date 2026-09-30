@@ -76,9 +76,8 @@ export default function Blog() {
                   <h2 className="text-2xl font-semibold mb-2">{post.title}</h2>
                   <p className="text-gray-600 mb-4">{post.excerpt}</p>
                   <Link href={`/blog/${post.id}`}
-                className="text-purple-700 hover:text-purple-500 font-semibold">
-                      Read More
-             
+                    className="text-purple-700 hover:text-purple-500 font-semibold">
+                    Read More
                   </Link>
                 </div>
               </div>
