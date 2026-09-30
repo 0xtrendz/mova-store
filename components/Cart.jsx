@@ -1,6 +1,6 @@
 import { FaShoppingCart } from "react-icons/fa";
 
-const Cart = ({ itemCount = 0, onClick }) => {
+const Cart = ({ itemCount = 0, total = 0, onClick }) => {
   const label =
     itemCount > 0
       ? `Shopping cart with ${itemCount} ${itemCount === 1 ? "item" : "items"}`
@@ -23,6 +23,11 @@ const Cart = ({ itemCount = 0, onClick }) => {
             {itemCount}
           </span>
         )}
+        {total > 0 && (
+          <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs font-semibold text-purple-700">
+            {`$${Number(total).toFixed(2)}`}
+          </span>
+        )
       </button>
     </div>
   );
