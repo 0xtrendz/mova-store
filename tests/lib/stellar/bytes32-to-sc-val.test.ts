@@ -21,4 +21,24 @@ describe("bytes32ToScVal browser-safe conversion", () => {
 
     expect(Array.from(scVal.bytes())).toEqual(Array.from(bytes));
   });
+
+  it("copies the input so a later mutation cannot change the built ScVal", () => {
+    const bytes = Uint8Array.from({ length: 32 }, () => 0xab);
+    const scVal = bytes32ToScVal(bytes);
+
+    // `scvBytes` retains the array it is handed, so a careless implementation
+    // (or dropping the copy) would let this mutation silently rewrite the ScVal.
+    bytes.fill(0x00);
+
+    expect(Array.from(scVal.bytes())).toEqual(Array.from({ length: 32 }, () => 0xab));
+  });
+
+  it("still rejects non-32-byte input after moving the cast into toSdkBytes", () => {
+    expect(() => bytes32ToScVal(new Uint8Array(31))).toThrow(
+      "order_id must be exactly 32 bytes (got 31)"
+    );
+    expect(() => bytes32ToScVal(hexToBytes("abcd"))).toThrow(
+      "order_id must be exactly 32 bytes (got 2)"
+    );
+  });
 });
