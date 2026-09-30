@@ -1,5 +1,5 @@
 import { Address, rpc, xdr } from "@stellar/stellar-sdk";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PaymentEventIndexer, type IndexedEvent } from "../../../lib/stellar/indexer";
 import {
@@ -9,7 +9,24 @@ import {
   symbolToScVal,
 } from "../../../lib/stellar/scval";
 
+/**
+ * Advance fake timers and let any pending microtasks (promise chains) settle.
+ * Using fake timers keeps these tests independent of wall-clock margins, so
+ * they stay deterministic even on a loaded CI runner.
+ */
+async function tick(ms: number): Promise<void> {
+  await vi.advanceTimersByTimeAsync(ms);
+}
+
 describe("PaymentEventIndexer startup retry (Issue #68)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("retries getLatestLedger when initial call fails and recovers without 'no cursor' error", async () => {
     let getLatestLedgerAttempts = 0;
     let getEventsCalled = false;
@@ -45,7 +62,7 @@ describe("PaymentEventIndexer startup retry (Issue #68)", () => {
     });
 
     // Wait for the first attempt to run and fail
-    await new Promise((resolve) => setTimeout(resolve, 15));
+    await tick(15);
     expect(getLatestLedgerAttempts).toBe(1);
     expect(getEventsCalled).toBe(false);
     expect(errors.some((e) => e.includes("Could not reach the Stellar RPC (retrying)"))).toBe(true);
@@ -54,7 +71,7 @@ describe("PaymentEventIndexer startup retry (Issue #68)", () => {
     expect(indexer.status.retrying).toBe(true);
 
     // Wait for second tick to succeed and begin polling
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await tick(60);
     expect(getLatestLedgerAttempts).toBeGreaterThanOrEqual(2);
     expect(getEventsCalled).toBe(true);
     expect(errors.some((e) => e.includes("no cursor or start ledger"))).toBe(false);
@@ -86,7 +103,7 @@ describe("PaymentEventIndexer startup retry (Issue #68)", () => {
       onEvent: () => {},
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await tick(100);
     expect(callCount).toBeGreaterThanOrEqual(2);
     expect(indexer.status.latestLedger).toBeGreaterThanOrEqual(202);
     expect(indexer.status.retrying).toBe(false);
@@ -112,11 +129,11 @@ describe("PaymentEventIndexer startup retry (Issue #68)", () => {
     (indexer as unknown as { server: unknown }).server = fakeServer;
 
     indexer.start({ onEvent: () => {} });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await tick(50);
     indexer.stop();
     const callsAtStop = getEventsCalls;
 
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await tick(60);
     expect(getEventsCalls).toBe(callsAtStop);
     expect(indexer.status.running).toBe(false);
   });
@@ -552,6 +569,14 @@ describe("PaymentEventIndexer.decodeEvent (Issue #85)", () => {
   });
 
   describe("End-to-end polling integration with decodeEvent", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it("filters and dispatches only watched successful contract events to onEvent", async () => {
       const receivedEvents: IndexedEvent[] = [];
 
@@ -601,7 +626,7 @@ describe("PaymentEventIndexer.decodeEvent (Issue #85)", () => {
         onEvent: (e) => receivedEvents.push(e),
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 60));
+      await tick(60);
       indexer.stop();
 
       expect(receivedEvents).toHaveLength(1);
@@ -615,6 +640,14 @@ describe("PaymentEventIndexer.decodeEvent (Issue #85)", () => {
 });
 
 describe("PaymentEventIndexer document visibility (Issue #636)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   const setDocumentHidden = (value: boolean) => {
     Object.defineProperty(document, "hidden", { configurable: true, get: () => value });
   };
@@ -634,7 +667,7 @@ describe("PaymentEventIndexer document visibility (Issue #636)", () => {
     (indexer as unknown as { server: unknown }).server = fakeServer;
 
     indexer.start({ onEvent: () => {} });
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await tick(60);
 
     expect(fakeServer.getLatestLedger).not.toHaveBeenCalled();
     expect(fakeServer.getEvents).not.toHaveBeenCalled();
@@ -658,14 +691,14 @@ describe("PaymentEventIndexer document visibility (Issue #636)", () => {
     (indexer as unknown as { server: unknown }).server = fakeServer;
 
     indexer.start({ onEvent: () => {} });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await tick(50);
     expect(calls).toBeGreaterThanOrEqual(1);
     const beforeHide = calls;
 
     // Hide the tab: the interval must be cleared so no further poll fires.
     setDocumentHidden(true);
     document.dispatchEvent(new Event("visibilitychange"));
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await tick(60);
     expect(indexer.status.paused).toBe(true);
     expect(calls).toBe(beforeHide);
 
@@ -673,7 +706,7 @@ describe("PaymentEventIndexer document visibility (Issue #636)", () => {
     // advancing the cursor from exactly where it stopped.
     setDocumentHidden(false);
     document.dispatchEvent(new Event("visibilitychange"));
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await tick(5);
     expect(indexer.status.paused).toBe(false);
     expect(calls).toBe(beforeHide + 1);
     expect(indexer.status.lastCursor).toBe(`cursor-${beforeHide + 1}`);
@@ -692,7 +725,7 @@ describe("PaymentEventIndexer document visibility (Issue #636)", () => {
     const removeSpy = vi.spyOn(document, "removeEventListener");
 
     indexer.start({ onEvent: () => {} });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await tick(0);
     indexer.stop();
 
     expect(removeSpy).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
@@ -702,6 +735,14 @@ describe("PaymentEventIndexer document visibility (Issue #636)", () => {
 });
 
 describe("PaymentEventIndexer overlapping-poll guard (Issue #632)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("keeps at most one poll in flight when a response outruns the interval", async () => {
     let active = 0;
     let maxActive = 0;
@@ -713,7 +754,7 @@ describe("PaymentEventIndexer overlapping-poll guard (Issue #632)", () => {
         calls += 1;
         active += 1;
         maxActive = Math.max(maxActive, active);
-        await new Promise((resolve) => setTimeout(resolve, 80));
+        await tick(80);
         active -= 1;
         return { latestLedger: 1000, cursor: `cursor-${calls}`, events: [] };
       }),
@@ -723,7 +764,7 @@ describe("PaymentEventIndexer overlapping-poll guard (Issue #632)", () => {
     (indexer as unknown as { server: unknown }).server = fakeServer;
 
     indexer.start({ onEvent: () => {} });
-    await new Promise((resolve) => setTimeout(resolve, 260));
+    await tick(260);
     indexer.stop();
 
     // Serialized: no second poll starts until the previous one has settled.
@@ -750,7 +791,7 @@ describe("PaymentEventIndexer overlapping-poll guard (Issue #632)", () => {
     const errors: string[] = [];
 
     indexer.start({ onEvent: () => {}, onError: (err) => errors.push(err.message) });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await tick(100);
     indexer.stop();
 
     expect(errors.some((e) => e.includes("getEvents failed"))).toBe(true);
