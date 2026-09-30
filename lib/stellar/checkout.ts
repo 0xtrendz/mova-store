@@ -78,7 +78,7 @@ export function usdToRawUnits(amountUsd: number): bigint {
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
     throw new WalletError("Invalid amount to pay.", "INVALID_AMOUNT");
   }
-  const raw = Math.round(amountUsd * 10 ** USDK_DECIMALS);
+  const raw = Math.round(amountUsd * 10 ** USDC_DECIMALS);
   return BigInt(raw);
 }
 
@@ -152,7 +152,7 @@ export async function payWithStellar(options: PayOptions): Promise<PayResult> {
   // 5. Sign with Freighter.
   onStatus("Waiting for Freighter signature…");
   const signedXdr = await signWithFreighter(prepared.toXDR(), publicKey);
-  const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSTHRASE);
+  const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
 
   // 6. Submit.
   onStatus("Submitting transaction…");

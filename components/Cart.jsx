@@ -27,7 +27,7 @@ const Cart = ({ itemCount = 0, total = 0, onClick }) => {
           <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs font-semibold text-purple-700">
             {`$${Number(total).toFixed(2)}`}
           </span>
-        )
+        )}
       </button>
     </div>
   );

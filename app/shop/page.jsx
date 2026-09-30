@@ -45,6 +45,7 @@ export default function Products() {
           {loading ? (
             <ProductGridSkeleton />
           ) : products.length > 0 ? (
+            <>
             <h2 id="shop-results-heading" className="sr-only">
               {products.length === 1 ? "1 product found" : `${products.length} products found`}
             </h2>
@@ -77,6 +78,7 @@ export default function Products() {
                 </li>
               ))}
             </ul>
+            </>
           ) : (
             // Only when the fetch resolved empty. On rejection the error above
             // is the whole story, and showing "no products yet" beside it would

@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect, useRef } from "react";
 import { AiOutlineMenu, AiOutlineClose } from "react-icons/ai";
 import { useAuth } from "../lib/AuthContext";
 import { logout } from "../lib/auth";
@@ -59,7 +58,6 @@ function Navbar() {
   const [showNav, setShowNav] = useState(false);
   const { user } = useAuth();
   const drawerRef = useRef(null);
-  const drawerRef2 = useRef(null);
   const toggleButtonRef = useRef(null);
 
   const toggleNav = () => setShowNav(!showNav);
@@ -188,7 +186,7 @@ function Navbar() {
                 >
                   Logout
                 </button>
-              <<>
+              </>
             ) : (
               <>
                 <Link href="/profile/login">
@@ -232,14 +230,12 @@ function Navbar() {
             />
             <div
               ref={drawerRef}
-              ref={drawerRef2}
               role="dialog"
               aria-modal="true"
               aria-label="Navigation menu"
               className="fixed inset-y-0 right-0 z-50 flex h-screen w-1/2 flex-col items-center bg-white py-6 shadow-mova"
             >
             <button
-              type="button"
               type="button"
               aria-label="Close navigation menu"
               className="mb-4 mr-4 self-end p-1 text-mova-ink rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-600"
@@ -304,7 +300,7 @@ function Navbar() {
                   >
                     Logout
                   </button>
-                <<>
+                </>
               ) : (
                 <div className="flex space-x-2">
                   <Link href="/profile/login" onClick={closeNavOnClick}>
