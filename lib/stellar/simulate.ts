@@ -96,6 +96,22 @@ export async function simulateContractRead(
   return sim.result?.retval ?? null;
 }
 
+export async function simulateContractReadOrThrow(
+  server: rpc.Server,
+  contractId: string,
+  fn: string,
+  args: xdr.ScVal[],
+  source?: string
+): Promise<xdr.ScVal | null> {
+  const account = new Account(source ?? Keypair.random().publicKey(), "0");
+  const tx = buildInvocationTransaction(account, contractId, fn, args);
+  const sim = await server.simulateTransaction(tx);
+  if (rpc.Api.isSimulationError(sim)) {
+    throw new Error(String(sim.error));
+  }
+  return sim.result?.retval ?? null;
+}
+
 /** Read the raw balance of `address` for any SEP-41 SAC token. */
 export async function readTokenBalance(
   server: rpc.Server,

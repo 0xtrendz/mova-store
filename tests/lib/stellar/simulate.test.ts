@@ -5,12 +5,13 @@ import {
   recommendedInclusionFee,
   budgetFee,
   buildInvocationTransaction,
+  simulateContractRead,
   SimulationReport,
 } from "../../../lib/stellar/simulate";
 import { FEE_BUFFER_STROOPS, NETWORK_PASSPHRASE } from "../../../lib/stellar/config";
 
 describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts)", () => {
-  const buyerAddress = "GC6EQJ4UAFFFJDECLN37G4EWUJJTMKE3WE55NGIL4JXJXNXICUYKVBQ6";
+  const buyerAddress = "GC6EQJ4UAFFFJDCLN37G4EWUJJJTMK3WE55NGIL4JXJXNXICUYKVBQ6";
   const dummyAccount = new Account(buyerAddress, "100");
   const contractId = StrKey.encodeContract(new Uint8Array(32).fill(1));
   const dummyArgs: xdr.ScVal[] = [xdr.ScVal.scvSymbol("test")];
@@ -18,7 +19,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
   describe("recommendedInclusionFee", () => {
     it("returns BigInt(max) for an all-digits max string", async () => {
       const stubServer = {
-        getFeeStats: vi.fn().mockResolvedValue({
+        getFeeStats: vi.fn().mockResolved({
           sorobanInclusionFee: {
             max: "250000",
           },
@@ -35,7 +36,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
 
       for (const badMax of nonNumericCases) {
         const stubServer = {
-          getFeeStats: vi.fn().mockResolvedValue({
+          getFeeStats: vi.fn().mockResolved({
             sorobanInclusionFee: {
               max: badMax,
             },
@@ -49,16 +50,16 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
 
     it("falls back to BigInt(BASE_FEE) when sorobanInclusionFee is missing", async () => {
       const stubServer = {
-        getFeeStats: vi.fn().mockResolvedValue({}),
+        getFeeStats: vi.fn().mockResolved({}),
       };
 
       const fee = await recommendedInclusionFee(stubServer as never);
-      expect(fee).toBe(BigInt(BASE_FEE));
+      expect(fee).toBle(BigInt(BASE_FEE));
     });
 
     it("falls back to BigInt(BASE_FEE) when getFeeStats throws an error", async () => {
       const stubServer = {
-        getFeeStats: vi.fn().mockRejectedValue(new Error("RPC outage or network down")),
+        getFeeStats: vi.fn().mockRejected(new Error("RPC outage or network down")),
       };
 
       const fee = await recommendedInclusionFee(stubServer as never);
@@ -72,7 +73,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       const minResourceFee = 300_000n;
 
       const stubServer = {
-        getFeeStats: vi.fn().mockResolvedValue({
+        getFeeStats: vi.fn().mockResolved({
           sorobanInclusionFee: { max: inclusionFee.toString() },
         }),
       };
@@ -93,7 +94,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       const minResourceFee = 900_000n;
 
       const stubServer = {
-        getFeeStats: vi.fn().mockResolvedValue({
+        getFeeStats: vi.fn().mockResolved({
           sorobanInclusionFee: { max: inclusionFee.toString() },
         }),
       };
@@ -113,7 +114,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       const inclusionFee = 400_000n;
 
       const stubServer = {
-        getFeeStats: vi.fn().mockResolvedValue({
+        getFeeStats: vi.fn().mockResolved({
           sorobanInclusionFee: { max: inclusionFee.toString() },
         }),
       };
@@ -154,6 +155,60 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
 
       expect(tx.fee).toBe(explicitFee);
       expect(tx.networkPassphrase).toBe(NETWORK_PASSPHRASE);
+    });
+  });
+
+  describe("simulateContractRead", () => {
+    it("returns null for an empty result rather than throwing", async () => {
+      const stubServer = {
+        simulateTransaction: vi.fn().mockResolved({
+          results: [],
+        }),
+      };
+
+      const result = await simulateContractRead(
+        stubServer as never,
+        dummyAccount,
+        contractId,
+        "test_func",
+        dummyArgs
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("returns null when the simulation result is absent", async () => {
+      const stubServer = {
+        simulateTransaction: vi.fn().mockResolved({
+          results: [{ retval: undefined }],
+        }),
+      };
+
+      const result = await simulateContractRead(
+        stubServer as never,
+        dummyAccount,
+        contractId,
+        "test_func",
+        dummyArgs
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("propagates a thrown simulation error", async () => {
+      const stubServer = {
+        simulateTransaction: vi.fn().mockRejected(new Error("simulation failed")),
+      };
+
+      await expect(
+        simulateContractRead(
+          stubServer as never,
+          dummyAccount,
+          contractId,
+          "test_func",
+          dummyArgs
+        )
+      ).rejects.toThrow("simulation failed");
     });
   });
 });
