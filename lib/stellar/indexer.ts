@@ -303,6 +303,8 @@ export class PaymentEventIndexer {
       this.latestLedger = res.latestLedger;
       this.lastError = undefined;
 
+      // Once a cursor is available, drop the start-ledger window so the next
+      // poll advances by cursor instead of re-scanning the backfill range.
       if (this.startLedger !== undefined) {
         this.startLedger = undefined;
       }
@@ -368,6 +370,11 @@ export class PaymentEventIndexer {
       this.clearPersistedCursor();
       this.startLedger = this.resolveStartLedger();
     }
+  }
+
+  /** Exposed for tests: current scan position (cursor or start ledger). */
+  get scanPosition(): { cursor?: string; startLedger?: number } {
+    return { cursor: this.cursor, startLedger: this.startLedger };
   }
 
   private decodeEvent(raw: rpc.Api.EventResponse): IndexedEvent | null {
