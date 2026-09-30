@@ -23,6 +23,9 @@ const { mockConnectWallet, mockCurrentAddress, mockPayWithStellar, WalletError }
 vi.mock("../../lib/stellar/freighter", () => ({
   connectWallet: (...args: any[]) => mockConnectWallet(...args),
   currentAddress: (...args: any[]) => mockCurrentAddress(...args),
+  // The button subscribes to wallet changes on mount (#864); the mock has to
+  // expose the subscribe call and hand back its unsubscribe.
+  watchWalletChanges: () => () => {},
   WalletError,
 }));
 

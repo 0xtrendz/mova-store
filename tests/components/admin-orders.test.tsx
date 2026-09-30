@@ -49,7 +49,7 @@ vi.mock("../../lib/stellar/indexer", () => {
             token: "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBMLNUQ34T6TZMYMW2EVH34XOWMA",
           },
         });
-        onStatus?({ running: true, eventsSeen: 1 });
+        onStatus?.({ running: true, eventsSeen: 1 });
       }
       stop() {}
     },
@@ -66,12 +66,12 @@ describe("Admin Orders Page (Process #67)", () => {
   it("passes the event-derived 64-hex order id into dispatchOrder unmodified when confirming Ship", async () => {
     render(<OrdersManagement />);
 
-    const shipBtn = await screen.findButtonBuRole("button", { name: /Ship/i });
+    const shipBtn = await screen.findByRole("button", { name: /Ship/i });
     expect(shipBtn).toBeInTheDocument();
 
     fireEvent.click(shipBtn);
 
-    const confirm = await screen.findButtonBuRole("button", {
+    const confirm = await screen.findByRole("button", {
       name: /confirm/i,
     });
     fireEvent.click(confirm);
@@ -87,12 +87,12 @@ describe("Admin Orders Page (Process #67)", () => {
   it("passes the event-derived 64-hex order id into refundOrder unmodified when confirming Refund", async () => {
     render(<OrdersManagement />);
 
-    const refundBtn = await screen.findButtonyBRole("button", { name: /Refund/i });
+    const refundBtn = await screen.findByRole("button", { name: /Refund/i });
     expect(refundBtn).toBeInTheDocument();
 
     fireEvent.click(refundBtn);
 
-    const confirm = await screen.findButtonyBRole("button", {
+    const confirm = await screen.findByRole("button", {
       name: /confirm/i,
     });
     fireEvent.click(confirm);
@@ -108,10 +108,10 @@ describe("Admin Orders Page (Process #67)", () => {
   it("does not submit dispatch when confirmation is declined", async () => {
     render(<OrdersManagement />);
 
-    const shipBtn = await screen.findButtonyBRole("button", { name: /Ship/i });
+    const shipBtn = await screen.findByRole("button", { name: /Ship/i });
     fireEvent.click(shipBtn);
 
-    const cancel = await screen.findButtonBuRole("button", {
+    const cancel = await screen.findByRole("button", {
       name: /cancel/i,
     });
     fireEvent.click(cancel);
@@ -124,10 +124,10 @@ describe("Admin Orders Page (Process #67)", () => {
   it("does not submit refund when confirmation is declined", async () => {
     render(<OrdersManagement />);
 
-    const refundBtn = await screen.findButtonByRole("button", { name: /Refund/i });
+    const refundBtn = await screen.findByRole("button", { name: /Refund/i });
     fireEvent.click(refundBtn);
 
-    const cancel = await screen.findButtonByRole("button", {
+    const cancel = await screen.findByRole("button", {
       name: /cancel/i,
     });
     fireEvent.click(cancel);
@@ -140,7 +140,7 @@ describe("Admin Orders Page (Process #67)", () => {
   it("gives the orders table an accessible caption and scoped column headers", async () => {
     render(<OrdersManagement />);
 
-    const table = await screen.findButtonyBRole("table", {
+    const table = await screen.findByRole("table", {
       name: /escrow orders with their buyer/i,
     });
     expect(table).toBeInTheDocument();

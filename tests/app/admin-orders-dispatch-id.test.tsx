@@ -7,8 +7,8 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 // truncation, no re-hashing — or the contract call cannot find the order.
 const EVENT_DERIVED_ID = "3f".repeat(32); // 64 hex chars
 
-const dispatchOrder = vi.fn.async (_orderId: string) => ({ success: true, txHash: "abc" });
-const refundOrder = vi.fn.async (_orderId: string) => ({ success: true, txHash: "def" });
+const dispatchOrder = vi.fn(async (_orderId: string) => ({ success: true, txHash: "abc" }));
+const refundOrder = vi.fn(async (_orderId: string) => ({ success: true, txHash: "def" }));
 
 vi.mock("../../lib/stellar/orders", () => ({
   dispatchOrder: (id: string) => dispatchOrder(id),
@@ -114,7 +114,7 @@ describe("admin orders page — order id passed to dispatch/refund", () => {
     const cancel = await screen.findByRole("button", { name: /cancel/i });
     fireEvent.click(cancel);
 
-    await waitFor(() => expect(screen.queryButton(/confirm/i)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/confirm/i)).toBeNull());
     expect(dispatchOrder).not.toHaveBeenCalled();
   });
 
@@ -127,7 +127,7 @@ describe("admin orders page — order id passed to dispatch/refund", () => {
     const cancel = await screen.findByRole("button", { name: /cancel/i });
     fireEvent.click(cancel);
 
-    await waitFor(() => expect(screen.queryButton(/confirm/i)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/confirm/i)).toBeNull());
     expect(refundOrder).not.toHaveBeenCalled();
   });
 });

@@ -51,7 +51,11 @@ describe("lib/stellar/config — mainnet resolution", () => {
   it("selects the mainnet RPC URL", async () => {
     const mod = await import("../../../lib/stellar/config");
     expect(mod.IS_MAINNET).toBe(true);
-    expect(mod.RPC_URL).toContain("mainnet");
+    // The mainnet endpoint is https://soroban-rpc.stellar.org, which does not
+    // contain the word "mainnet" — asserting that substring tests the hostname's
+    // spelling rather than the thing we care about. Pin the endpoint and assert it
+    // is not the testnet one.
+    expect(mod.RPC_URL).toBe("https://soroban-rpc.stellar.org");
     expect(mod.RPC_URL).not.toContain("testnet");
   });
 

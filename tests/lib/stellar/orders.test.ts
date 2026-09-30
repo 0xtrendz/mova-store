@@ -227,14 +227,14 @@ describe("resolveOrderIdHash (Issue #67)", () => {
 describe("dispatchOrder and refundOrder order ID resolution", () => {
   const SAMPLE_64_HEX =
     "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
-  const DuMMY_PUBLIC_KEY = "GBBD47IF6LWK7P7MDEVSCWR7DPVWV3NY3DTQEVFL4NAT4AQH3ZlLFLA5";
+  const DUMMY_PUBLIC_KEY = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("resolves 64-hex order ID directly without double-hashing in dispatchOrder", async () => {
-    vi.spyOn(freighterMod, "connectWallet").mockResolved(DuMMY_PUBLIC_KEY);
+    vi.spyOn(freighterMod, "connectWallet").mockResolvedValue(DUMMY_PUBLIC_KEY);
 
     // We can verify resolveOrderIdHash directly on the input passed to dispatchOrder
     const resolvedBytes = await resolveOrderIdHash(SAMPLE_64_HEX);
@@ -296,7 +296,7 @@ describe("Admin Orders Dashboard Event Integration (Issue #67 Acceptance Criteri
 describe("formatOrderAmount (Issue: format amounts from bigint)", () => {
   it("formats a large i128 amount exactly without floating-point loss", () => {
     // 2^53 + one in raw units. Number() would round this.
-    const raw = 9007199254740993.n();
+    const raw = 9007199254740993n;
     expect(formatOrderAmount(raw, 7)).toBe("900719925.4740993");
   });
 
@@ -326,7 +326,7 @@ describe("formatOrderAmount (Issue: format amounts from bigint)", () => {
       currency: "USDC",
       status: "Paid",
       buyer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-      seller: "GBBD47IF6LWK7P7MDEVSCWR7DPVWV3NY3DTQEVFL4NAT4AQH3ZlLFLA5",
+      seller: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
     };
     const row = formatOrderRow(order, 7);
     expect(row.amountDisplay).toBe("900719925.4740993");

@@ -19,7 +19,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
   describe("recommendedInclusionFee", () => {
     it("returns BigInt(max) for an all-digits max string", async () => {
       const stubServer = {
-        getFeeStats: vi.fn().mockResolved({
+        getFeeStats: vi.fn().mockResolvedValue({
           sorobanInclusionFee: {
             max: "250000",
           },
@@ -36,7 +36,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
 
       for (const badMax of nonNumericCases) {
         const stubServer = {
-          getFeeStats: vi.fn().mockResolved({
+          getFeeStats: vi.fn().mockResolvedValue({
             sorobanInclusionFee: {
               max: badMax,
             },
@@ -50,7 +50,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
 
     it("falls back to BigInt(BASE_FEE) when sorobanInclusionFee is missing", async () => {
       const stubServer = {
-        getFeeStats: vi.fn().mockResolved({}),
+        getFeeStats: vi.fn().mockResolvedValue({}),
       };
 
       const fee = await recommendedInclusionFee(stubServer as never);
@@ -73,7 +73,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       const minResourceFee = 300_000n;
 
       const stubServer = {
-        getFeeStats: vi.fn().mockResolved({
+        getFeeStats: vi.fn().mockResolvedValue({
           sorobanInclusionFee: { max: inclusionFee.toString() },
         }),
       };
@@ -94,7 +94,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       const minResourceFee = 900_000n;
 
       const stubServer = {
-        getFeeStats: vi.fn().mockResolved({
+        getFeeStats: vi.fn().mockResolvedValue({
           sorobanInclusionFee: { max: inclusionFee.toString() },
         }),
       };
@@ -114,7 +114,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       const inclusionFee = 400_000n;
 
       const stubServer = {
-        getFeeStats: vi.fn().mockResolved({
+        getFeeStats: vi.fn().mockResolvedValue({
           sorobanInclusionFee: { max: inclusionFee.toString() },
         }),
       };
@@ -161,7 +161,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
   describe("simulateContractRead", () => {
     it("returns null for an empty result rather than throwing", async () => {
       const stubServer = {
-        simulateTransaction: vi.fn().mockResolved({
+        simulateTransaction: vi.fn().mockResolvedValue({
           results: [],
         }),
       };
@@ -179,7 +179,7 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
 
     it("returns null when the simulation result is absent", async () => {
       const stubServer = {
-        simulateTransaction: vi.fn().mockResolved({
+        simulateTransaction: vi.fn().mockResolvedValue({
           results: [{ retval: undefined }],
         }),
       };

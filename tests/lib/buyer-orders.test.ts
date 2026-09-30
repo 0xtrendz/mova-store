@@ -189,7 +189,7 @@ describe("Buyer Orders Management", () => {
   });
 
   it("verifies order on-chain via readOrder", async () => {
-    vi.spyOn(stellarOrders, "readOrder").mockResolvedOnce({
+    vi.spyOn(stellarOrders, "readOrder").mockResolvedValueOnce({
       orderId: "SS-101",
       orderIdHash: "010203",
       buyer: OWNER_ADDRESS,
@@ -207,14 +207,14 @@ describe("Buyer Orders Management", () => {
   });
 
   it("returns verified false when on-chain order is not found or Unknown", async () => {
-    vi.spyOn(stellarOrders, "readOrder").mockResolvedOnce(null);
+    vi.spyOn(stellarOrders, "readOrder").mockResolvedValueOnce(null);
     const verification = await verifyOrderOnChain("UNKNOWN-1");
     expect(verification.verified).toBe(false);
   });
 
   describe("verifyOrderOnChain ownership", () => {
     it("reports a matching buyer as verified and returns their address", async () => {
-      vi.spyOn(stellarOrders, "readOrder").mockResolvedOnce({
+      vi.spyOn(stellarOrders, "readOrder").mockResolvedValueOnce({
         orderId: "SS-101",
         orderIdHash: "010203",
         buyer: OWNER_ADDRESS,
@@ -233,7 +233,7 @@ describe("Buyer Orders Management", () => {
     });
 
     it("reports a mismatched buyer as not verified and returns the on-chain buyer", async () => {
-      vi.spyOn(stellarOrders, "readOrder").mockResolvedOnce({
+      vi.spyOn(stellarOrders, "readOrder").mockResolvedValueOnce({
         orderId: "SS-101",
         orderIdHash: "010203",
         buyer: OWNER_ADDRESS,
@@ -252,7 +252,7 @@ describe("Buyer Orders Management", () => {
     });
 
     it("reports an absent order as not verified", async () => {
-      vi.spyOn(stellarOrders, "readOrder").mockResolvedOnce(null);
+      vi.spyOn(stellarOrders, "readOrder").mockResolvedValueOnce(null);
 
       const verification = await verifyOrderOnChain("SS-MISSING", OWNER_ADDRESS);
 
