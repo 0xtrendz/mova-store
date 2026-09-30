@@ -93,7 +93,7 @@ describe("admin orders page — order id passed to dispatch/refund", () => {
   it("passes the event-derived hex order id to refundOrder unmodified", async () => {
     render(<AdminOrdersPage />);
 
-    const refund = await screen.findBuRole("button", { name: /refund/i });
+    const refund = await screen.findByRole("button", { name: /refund/i });
     fireEvent.click(refund);
 
     const confirm = await screen.findByRole("button", { name: /confirm/i });
@@ -108,7 +108,7 @@ describe("admin orders page — order id passed to dispatch/refund", () => {
   it("does not submit dispatch when confirmation is declined", async () => {
     render(<AdminOrdersPage />);
 
-    const ship = await screen.findBuRole("button", { name: /ship/i });
+    const ship = await screen.findByRole("button", { name: /ship/i });
     fireEvent.click(ship);
 
     const cancel = await screen.findByRole("button", { name: /cancel/i });
