@@ -11,7 +11,12 @@ import {
   OrderStatus,
   mergeOrderEvents,
 } from "../../../lib/stellar/orders";
-import { NETWORK, CHECKOUT_CONTRACT_ID } from "../../../lib/stellar/config";
+import {
+  NETWORK,
+  CHECKOUT_CONTRACT_ID,
+  CHECKOUT_START_LEDGER,
+  ADMIN_ORDERS_CURSOR_STORAGE_KEY,
+} from "../../../lib/stellar/config";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import {
   MdRefresh,
@@ -172,7 +177,15 @@ const OrdersManagementContent = () => {
 
   // Initialize event indexer
   useEffect(() => {
-    const indexer = new PaymentEventIndexer();
+    // The admin table is an operations view: it must show orders paid long
+    // before the ~8-minute rolling backfill window, and it must not re-walk
+    // that window on every navigation. Scan from the durable checkout deploy
+    // ledger (when configured) and persist the resume cursor so a reload
+    // continues where the last scan stopped.
+    const indexer = new PaymentEventIndexer({
+      startLedger: CHECKOUT_START_LEDGER,
+      cursorStorageKey: ADMIN_ORDERS_CURSOR_STORAGE_KEY,
+    });
 
     indexer.start({
       onEvent: (event: IndexedEvent) => {
