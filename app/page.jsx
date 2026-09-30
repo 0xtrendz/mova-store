@@ -1,6 +1,5 @@
 "use client";
 import Hero from "./(landingpage)/Hero";
-import Link from "next/link";
 import Carousel from "./(landingpage)/Categories";
 import Catalogue from "./(landingpage)/Catalogue";
 import Catalogue2 from "./(landingpage)/Catalogue2";
@@ -20,7 +19,6 @@ export default function FirstPage() {
     <>
       {/* Hero & Product Showcase */}
       <Hero />
-      <Link href="/blog" className="sr-only">Blog</Link>
       <Carousel />
       <Catalogue />
 
@@ -40,7 +38,7 @@ export default function FirstPage() {
       <Testimonials />
 
       {/* FAQ */}
-      <FAQ .>
+      <FAQ />
 
       {/* Mission & OSS */}
       <AboutUs />
