@@ -7,6 +7,7 @@ const { CONTRACT_ID, CONTRACT_ID_STR } = vi.hoisted(() => {
   return {
     CONTRACT_ID: bytes,
     CONTRACT_ID_STR: "CADQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQP5KR",
+    FOREIGN_CONTRACT_ID_STR: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
   };
 });
 
@@ -29,6 +30,7 @@ import { i128ToScVal, hexToBytes } from "../../../lib/stellar/scval";
 const TOKEN = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA";
 const BUYER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 const MERCHANT = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+const FOREIGN_CONTRACT_ID = StrKey.decodeContract("CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4");
 const ORDER_ID_HEX = "a1" + "b2".repeat(31); // 64 hex chars == 32 bytes
 const TX_HASH = "0123456789abcdef".repeat(4);
 const LEDGER = 4242;
@@ -90,6 +92,28 @@ describe("decodePaymentEvent", () => {
     // the 32-byte order id topic comes back as a 64-char hex string
     expect(receipt?.orderId).toBe(ORDER_ID_HEX);
     expect(receipt?.amount).toBe("123400000");
+  });
+
+  it("returns null for a pay event emitted by a foreign contract", () => {
+    const foreignPay = makeEvent(payTopics(), amountMap(1n), FOREIGN_CONTRACT_ID);
+    expect(decodePaymentEvent(makeTx([foreignPay]) as never)).toBeNull();
+  });
+
+  it("returns null for a non-pay event from the checkout contract", () => {
+    const nonPay = makeEvent(
+      [xdr.ScVal.scvSymbol("transfer"), addressScVal(TOKEN)],
+      amountMap(1n),
+      CONTRACT_ID
+    );
+    expect(decodePaymentEvent(makeTx([nonPay]) as never)).toBeNull();
+  });
+
+  it("still decodes a genuine pay from the checkout contract", () => {
+    const genuine = makeEvent(payTopics(), amountMap(77n), CONTRACT_ID);
+    const receipt = decodePaymentEvent(makeTx([genuine]) as never);
+    expect(receipt).not.toBeNull();
+    expect(receipt?.contractId).toBe(StrKey.encodeContract(CONTRACT_ID));
+    expect(receipt?.amount).toBe("77");
   });
 
   it("skips events whose first topic is not the 'pay' symbol", () => {
