@@ -5,16 +5,20 @@ import Link from "next/link";
 import { useAuth } from "../../lib/AuthContext";
 import { BuyerOrder, fetchBuyerOrders } from "../../lib/buyer-orders";
 import OrderCard from "../../components/OrderCard";
-import { MdShoppingBag, MdRefresh, MdLockOutline } from "react-icons/md";
+import { MdShoppingBag, MdRefresh, MdLockOutline, MdErrorOutline } from "react-icons/md";
 import { SiStellar } from "react-icons/si";
 
 export default function BuyerOrdersPage() {
   const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<BuyerOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed read must not be rendered as "you have no orders": keep the failure
+  // in its own state so the empty and error states stay distinct.
+  const [error, setError] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const userIdentifier = user?.email || user?.uid;
       const data = await fetchBuyerOrders(userIdentifier);
@@ -22,6 +26,11 @@ export default function BuyerOrdersPage() {
     } catch (err) {
       console.error("Error fetching orders:", err);
       setOrders([]);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while loading your orders."
+      );
     } finally {
       setLoading(false);
     }
@@ -31,6 +40,34 @@ export default function BuyerOrdersPage() {
     if (!authLoading) {
       loadOrders();
     }
+  }, [authLoading, loadOrders]);
+
+  // Orders are written by the checkout flow, often moments after this page was
+  // last read, and sometimes from another tab. Re-read when the tab becomes
+  // visible again and when another tab writes the shared cache (the `storage`
+  // event never fires in the tab that performed the write), so a newly paid
+  // order appears without a full page reload.
+  useEffect(() => {
+    if (authLoading) return;
+
+    const refresh = () => {
+      void loadOrders();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === "mova_buyer_orders") refresh();
+    };
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("storage", onStorage);
+    };
   }, [authLoading, loadOrders]);
 
   return (
@@ -109,6 +146,31 @@ export default function BuyerOrdersPage() {
               </div>
             </div>
           ))}
+        </div>
+      ) : error ? (
+        /* Error State — kept distinct from the empty state below so a failed
+           read is never presented as "you have no orders". */
+        <div
+          role="alert"
+          data-testid="orders-error"
+          className="text-center py-16 px-4 bg-white rounded-2xl border border-rose-200 shadow-sm"
+        >
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600 mb-4">
+            <MdErrorOutline size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">
+            We couldn&apos;t load your orders
+          </h2>
+          <p className="text-gray-500 max-w-sm mx-auto text-sm mb-6">{error}</p>
+          <button
+            type="button"
+            onClick={loadOrders}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-mova transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+          >
+            <MdRefresh size={18} className={loading ? "animate-spin" : ""} />
+            <span>Try again</span>
+          </button>
         </div>
       ) : orders.length > 0 ? (
         /* Orders List */
