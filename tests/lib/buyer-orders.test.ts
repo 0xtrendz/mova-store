@@ -4,6 +4,7 @@ import {
   getCachedBuyerOrders,
   fetchBuyerOrders,
   verifyOrderOnChain,
+  BuyerOrderPersistenceError,
   BuyerOrder,
 } from "../../lib/buyer-orders";
 import * as stellarOrders from "../../lib/stellar/orders";
@@ -14,10 +15,15 @@ import * as stellarOrders from "../../lib/stellar/orders";
  */
 const db = vi.hoisted(() => ({ rows: [] as Record<string, unknown>[] }));
 
+// Shared so a test can make the insert resolve with an { error } (issue #561).
+const insertMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ data: null, error: null }),
+);
+
 vi.mock("../../lib/supabase", () => ({
   supabase: {
     from: vi.fn(() => ({
-      insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+      insert: insertMock,
       select: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       eq: vi.fn(() => Promise.resolve({ data: db.rows, error: null })),
@@ -58,6 +64,7 @@ describe("Buyer Orders Management", () => {
     localStorage.clear();
     vi.clearAllMocks();
     db.rows = [{ ...DB_ROW }];
+    insertMock.mockResolvedValue({ data: null, error: null });
   });
 
   it("saves an order and caches it in localStorage", async () => {
@@ -68,6 +75,21 @@ describe("Buyer Orders Management", () => {
     expect(cached.length).toBe(1);
     expect(cached[0].orderId).toBe("SS-101");
     expect(cached[0].tokenSymbol).toBe("XLM");
+  });
+
+  it("throws and stays cache-only when the insert resolves with an error (issue #561)", async () => {
+    insertMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'duplicate key value violates unique constraint "orders_pkey"' },
+    });
+
+    await expect(saveBuyerOrder(sampleOrder)).rejects.toBeInstanceOf(
+      BuyerOrderPersistenceError
+    );
+
+    // The order is still cached locally (continuity), but it is cache-only.
+    const cached = getCachedBuyerOrders();
+    expect(cached.map((o) => o.orderId)).toContain("SS-101");
   });
 
   it("updates an existing order when same orderId is saved again", async () => {

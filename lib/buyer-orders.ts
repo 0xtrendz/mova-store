@@ -127,10 +127,37 @@ function validateBuyerOrder(value: unknown): BuyerOrder | null {
 }
 
 /**
+ * Raised when an order could not be written to Supabase.
+ *
+ * ``saveBuyerOrder`` caches locally first, so ``order`` is still usable; the
+ * error only signals that the row was **not** persisted. ``supabase-js``
+ * reports database failures by resolving with ``{ error }`` (it does not
+ * reject), so this is thrown explicitly to surface the failure to the caller.
+ */
+export class BuyerOrderPersistenceError extends Error {
+  readonly order: BuyerOrder;
+
+  constructor(message: string, order: BuyerOrder) {
+    super(message);
+    this.name = "BuyerOrderPersistenceError";
+    this.order = order;
+  }
+}
+
+/**
  * Saves an order to Supabase and syncs to local storage cache.
+ *
+ * The local cache is the continuity mechanism and is written first. The
+ * Supabase insert result is inspected: a duplicate id, a constraint violation,
+ * or an RLS denial resolves with ``{ error }`` and is surfaced as a
+ * :class:`BuyerOrderPersistenceError` rather than being reported as a
+ * successful write.
+ *
+ * @throws {BuyerOrderPersistenceError} when the row was not persisted (the
+ *   order is still available on the error as ``error.order`` and in the cache).
  */
 export async function saveBuyerOrder(order: BuyerOrder): Promise<BuyerOrder> {
-  // 1. Cache to localStorage
+  // 1. Cache to localStorage first so the order survives even if persistence fails.
   try {
     const cached = getCachedBuyerOrders();
     const existingIndex = cached.findIndex((o) => o.orderId === order.orderId);
@@ -146,32 +173,41 @@ export async function saveBuyerOrder(order: BuyerOrder): Promise<BuyerOrder> {
     console.warn("Failed to cache order to localStorage:", err);
   }
 
-  // 2. Try persisting to Supabase if table exists
-  try {
-    if (supabase) {
-      await supabase.from("orders").insert([
-        {
-          id: order.id,
-          order_id: order.orderId,
-          user_id: order.userId || null,
-          user_email: order.userEmail || null,
-          total: order.total,
-          status: order.status,
-          payment_method: order.paymentMethod,
-          token_symbol: order.tokenSymbol || null,
-          token_amount: order.tokenAmount || null,
-          tx_hash: order.txHash || null,
-          items: order.items,
-          created_at: order.createdAt,
-        },
-      ]);
-    }
-  } catch (err) {
-    // Supabase table may not exist yet in dev or offline; local cache ensures continuity
-    console.warn("Could not insert order into Supabase, kept in local cache:", err);
+  // 2. Persist to Supabase, inspecting the resolved result (see the docstring).
+  if (!supabase) {
+    return order;
   }
-
-  return order;
+  try {
+    const { error } = await supabase.from("orders").insert([
+      {
+        id: order.id,
+        order_id: order.orderId,
+        user_id: order.userId || null,
+        user_email: order.userEmail || null,
+        total: order.total,
+        status: order.status,
+        payment_method: order.paymentMethod,
+        token_symbol: order.tokenSymbol || null,
+        token_amount: order.tokenAmount || null,
+        tx_hash: order.txHash || null,
+        items: order.items,
+        created_at: order.createdAt,
+      },
+    ]);
+    if (error) {
+      console.warn("Could not insert order into Supabase, kept in local cache:", error.message);
+      throw new BuyerOrderPersistenceError(error.message, order);
+    }
+    return order;
+  } catch (err) {
+    if (err instanceof BuyerOrderPersistenceError) {
+      throw err;
+    }
+    // A thrown error (e.g. offline / network failure) also leaves the order cache-only.
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn("Could not insert order into Supabase, kept in local cache:", message);
+    throw new BuyerOrderPersistenceError(message, order);
+  }
 }
 
 /**
