@@ -128,7 +128,7 @@ reported at startup instead of on the first checkout or email attempt.
 2. If Friendbot fails, manually fund at https://friendbot.stellar.org
 3. Check account status:
    ```bash
-   stellar account info --network testnet <YOUR_PUBLIC_KEY>
+   stellar account info --network testnet --source-account <YOUR_PUBLIC_KEY>
    ```
 
 ---
@@ -364,5 +364,5 @@ stellar tx details <TX_HASH> --network testnet
 Monitor contract events:
 
 ```bash
-stellar events --id <CONTRACT_ID> --network testnet --start-ledger <LEDGER>
+stellar events --id <CONTRACT_ID> --network testnet --start-ledger <LEGGER>
 ```
