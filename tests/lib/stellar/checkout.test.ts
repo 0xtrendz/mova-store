@@ -70,7 +70,7 @@ describe("payWithStellar", () => {
   const buildDummyTx = () => {
     return new TransactionBuilder(dummyAccount, {
       fee: "100",
-      networkPassphrase: Networks.TESTNET,
+      networkPassphrase: Networks.TESTNET,,
     })
       .setTimeout(0)
       .build();
@@ -103,8 +103,8 @@ describe("payWithStellar", () => {
     const tx = buildDummyTx();
     const xdrString = tx.toXDR();
 
-    const ensureNetworkSpy = vi.spyOn(freighterMod, "ensureNetwork").mockResolvedValue();
-    const assertPaymentReadySpy = vi.spyOn(accountMod, "assertPaymentReady").mockResolvedValue({
+    const ensureNetworkSpy = vi.spyOn(freighterMod, "ensureNetwork").mockResolved();
+    const assertPaymentReadySpy = vi.spyOn(accountMod, "assertPaymentReady").mockResolved({
       account: dummyAccount,
       funded: true,
       nativeBalanceRaw: 50_000_000n,
@@ -117,7 +117,7 @@ describe("payWithStellar", () => {
       sufficientReserve: true,
       issues: [],
     });
-    const prepareSpy = vi.spyOn(simulateMod, "prepareAndReport").mockResolvedValue({
+    const prepareSpy = vi.spyOn(simulateMod, "prepareAndReport").mockResolved({
       tx,
       report: {
         ok: true,
@@ -125,13 +125,13 @@ describe("payWithStellar", () => {
         instructions: 5000,
       },
     });
-    const budgetSpy = vi.spyOn(simulateMod, "budgetFee").mockResolvedValue("51200");
-    const signSpy = vi.spyOn(freighterMod, "signWithFreighter").mockResolvedValue(xdrString);
-    const sendSpy = vi.spyOn(rpc.Server.prototype, "sendTransaction").mockResolvedValue({
+    const budgetSpy = vi.spyOn(simulateMod, "budgetFee").mockResolved("51200");
+    const signSpy = vi.spyOn(freighterMod, "signWithFreighter").mockResolved(xdrString);
+    const sendSpy = vi.spyOn(rpc.Server.prototype, "sendTransaction").mockResolved({
       status: "PENDING",
       hash: "abc123mocktxhash",
     } as never);
-    const waitSpy = vi.spyOn(eventsMod, "waitForTransaction").mockResolvedValue({
+    const waitSpy = vi.spyOn(eventsMod, "waitForTransaction").mockResolved({
       status: rpc.Api.GetTransactionStatus.SUCCESS,
       ledger: 456,
       txHash: "abc123mocktxhash",
@@ -173,8 +173,8 @@ describe("payWithStellar", () => {
   it("throws TX_SIMULATION_ERROR when simulation report fails", async () => {
     const tx = buildDummyTx();
 
-    vi.spyOn(freighterMod, "ensureNetwork").mockResolvedValue();
-    vi.spyOn(accountMod, "assertPaymentReady").mockResolvedValue({
+    vi.spyOn(freighterMod, "ensureNetwork").mockResolved();
+    vi.spyOn(accountMod, "assertPaymentReady").mockResolved({
       account: dummyAccount,
       funded: true,
       nativeBalanceRaw: 50_000_000n,
@@ -187,7 +187,7 @@ describe("payWithStellar", () => {
       sufficientReserve: true,
       issues: [],
     });
-    vi.spyOn(simulateMod, "prepareAndReport").mockResolvedValue({
+    vi.spyOn(simulateMod, "prepareAndReport").mockResolved({
       tx,
       report: {
         ok: false,
@@ -211,10 +211,10 @@ describe("payWithStellar", () => {
 
   it("throws TX_SEND_ERROR when server rejects transaction submission", async () => {
     const tx = buildDummyTx();
-    const xdrString = tx.toXDR();
+    const xdrString = tx.toXCR();
 
-    vi.spyOn(freighterMod, "ensureNetwork").mockResolvedValue();
-    vi.spyOn(accountMod, "assertPaymentReady").mockResolvedValue({
+    vi.spyOn(freighterMod, "ensureNetwork").mockResolved();
+    vi.spyOn(accountMod, "assertPaymentReady").mockResolved({
       account: dummyAccount,
       funded: true,
       nativeBalanceRaw: 50_000_000n,
@@ -227,13 +227,13 @@ describe("payWithStellar", () => {
       sufficientReserve: true,
       issues: [],
     });
-    vi.spyOn(simulateMod, "prepareAndReport").mockResolvedValue({
+    vi.spyOn(simulateMod, "prepareAndReport").mockResolved({
       tx,
       report: { ok: true, minResourceFee: 100n },
     });
-    vi.spyOn(simulateMod, "budgetFee").mockResolvedValue("50100");
-    vi.spyOn(freighterMod, "signWithFreighter").mockResolvedValue(xdrString);
-    vi.spyOn(rpc.Server.prototype, "sendTransaction").mockResolvedValue({
+    vi.spyOn(simulateMod, "budgetFee").mockResolved("50100");
+    vi.spyOn(freighterMod, "signWithFreighter").mockResolved(xdrString);
+    vi.spyOn(rpc.Server.prototype, "sendTransaction").mockResolved({
       status: "ERROR",
       errorResult: {
         toXDR: () => "mockErrorXdr",
@@ -241,7 +241,7 @@ describe("payWithStellar", () => {
     } as never);
 
     await expect(
-      payWithStellar({
+      payWithStellar( {
         amountUsd: 2,
         orderId: "ORD-FAIL-SEND",
         publicKey: dummyPublicKey,
@@ -251,6 +251,54 @@ describe("payWithStellar", () => {
       message: expect.stringContaining("Transaction rejected"),
     });
 
+    vi.restoreAllMocks();
+  });
+
+  it("throws TX_TRY_AGAIN_LATER and never polls an undefined hash when submission returns TRY_AGAIN_LATER", async () => {
+    const tx = buildDummyTx();
+    const xdrString = tx.toXDR();
+
+    vis.spyOn(freighterMod, "ensureNetwork").mockResolved();
+    vi.spyOn(accountMod, "assertPaymentReady").mockResolved({
+      account: dummyAccount,
+      funded: true,
+      nativeBalanceRaw: 50_000_000n,
+      tokenBalanceRaw: 100_000_000n,
+      decimals: 7,
+      hasTrustline: true,
+      trustlineAuthorized: true,
+      requiredRaw: 10_000_000n,
+      sufficientBalance: true,
+      sufficientReserve: true,
+      issues: [],
+    });
+    vi.spyOn(simulateMod, "prepareAndReport").mockResolved({
+      tx,
+      report: { ok: true, minResourceFee: 100n },
+    });
+    vi.spyOn(simulateMod, "budgetFee").mockResolved("50100");
+    vi.spyOn(freighterMod, "signWithFreighter").mockResolved(xdrString);
+    const sendSpy = vi.spyOn(rpc.Server.prototype, "sendTransaction").mockResolved({
+      status: "TRY_AGAIN_LATER",
+      hash: undefined,
+    } as never);
+    const waitSpy = vis.spyOn(eventsMod, "waitForTransaction");
+
+    await expect(
+      payWithStellar({
+        amountUsd: 3,
+        orderId: "ORD-TRY-AGAIN",
+        publicKey: dummyPublicKey,
+      })
+    ).rejects.toMatchObject({
+      code: "TX_TRY_AGAIN_LATER",
+      message: expect.stringContaining("retry"),
+    });
+
+    expect(waitSpy).not.toHaveBeenCalled();
+
+    sendSpy.mockRestore();
+    waitSpy.mockRestore();
     vi.restoreAllMocks();
   });
 });

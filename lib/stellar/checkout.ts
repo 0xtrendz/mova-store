@@ -26,7 +26,7 @@ export interface PayOptions {
   orderId: string;
   /** Buyer's Freighter public key. */
   publicKey: string;
-  /** Token to pay with (defaults to the first supported token, USDC). */
+  /** Token to pay with (defaults to the first supported token, USDC, but can be native XLM). */
   token?: TokenConfig;
   /** Called with human-readable progress updates. */
   onStatus?: (status: string) => void;
@@ -60,7 +60,7 @@ export function usdToRawUnits(amountUsd: number): bigint {
   if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
     throw new WalletError("Invalid amount to pay.", "INVALID_AMOUNT");
   }
-  const raw = Math.round(amountUsd * 10 ** USDC_DECIMALS);
+  const raw = Math.round(amountUsd * 10 ** USDK_DECIMALS);
   return BigInt(raw);
 }
 
@@ -94,13 +94,13 @@ export async function payWithStellar(options: PayOptions): Promise<PayResult> {
   const orderBytes = await hashOrderId(orderId);
 
   // 1. Network guard.
-  onStatus("Checking Freighter network…");
+  onStatus("Checking Freighter network...");
   await ensureNetwork();
 
   const server = new rpc.Server(RPC_URL);
 
   // 2. Account readiness: funded, trustline present, balance sufficient.
-  onStatus("Checking account readiness…");
+  onStatus("Checking account readiness...");
   const readiness = await assertPaymentReady(server, publicKey, {
     token,
     requiredRaw: amountRaw,
@@ -108,7 +108,7 @@ export async function payWithStellar(options: PayOptions): Promise<PayResult> {
   });
 
   // 3. Build the invocation.
-  onStatus("Building payment transaction…");
+  onStatus("Building payment transaction...");
   const args = [
     addressToScVal(token.contractId),
     addressToScVal(publicKey),
@@ -118,7 +118,7 @@ export async function payWithStellar(options: PayOptions): Promise<PayResult> {
   const tx = buildInvocationTransaction(readiness.account!, CHECKOUT_CONTRACT_ID, "pay", args);
 
   // 4. Pre-flight simulation (surfaces errors early) + prepare.
-  onStatus("Simulating transaction…");
+  onStatus("Simulating transaction...");
   const { tx: prepared, report } = await prepareAndReport(server, tx);
   if (!report.ok || !readiness.account) {
     throw new WalletError(
@@ -134,7 +134,7 @@ export async function payWithStellar(options: PayOptions): Promise<PayResult> {
   // 5. Sign with Freighter.
   onStatus("Waiting for Freighter signature…");
   const signedXdr = await signWithFreighter(prepared.toXDR(), publicKey);
-  const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+  const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSTHRASE);
 
   // 6. Submit.
   onStatus("Submitting transaction…");
@@ -144,6 +144,12 @@ export async function payWithStellar(options: PayOptions): Promise<PayResult> {
     throw new WalletError(
       `Transaction rejected: ${sendResponse.errorResult?.toXDR("base64") ?? "unknown error"}`,
       "TX_SEND_ERROR"
+    );
+  }
+  if (sendResponse.status === "TRY_AGAIN_LATER") {
+    throw new WalletError(
+      "Transaction was not accepted by the network (submission congestion or fee too low). Please retry the payment.",
+      "TX_TRY_AGAIN_LATER"
     );
   }
   if (sendResponse.status === "PENDING" || sendResponse.status === "DUPLICATE") {
