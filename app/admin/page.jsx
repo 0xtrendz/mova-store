@@ -8,6 +8,7 @@ import AdminGuard from "../../components/AdminGuard";
 import Link from "next/link";
 import { SiStellar } from "react-icons/si";
 import { MdInventory } from "react-icons/md";
+import Image from "next/image";
 
 const ProductsAdminContent = () => {
   const { products, error } = useProducts();
@@ -101,9 +102,11 @@ const ProductsAdminContent = () => {
                   <td className="py-4 px-6 text-gray-800">{product.name}</td>
                   <td className="py-4 px-6 text-gray-800">${Number(product.price).toFixed(2)}</td>
                   <td className="py-4 px-6">
-                    <img
+                    <Image
                       src={product.img}
                       alt={product.name}
+                      width={80}
+                      height={80}
                       className="h-20 w-20 object-cover rounded-lg border border-gray-300"
                     />
                   </td>

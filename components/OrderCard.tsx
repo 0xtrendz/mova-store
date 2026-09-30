@@ -120,10 +120,11 @@ export default function OrderCard({ order }: OrderCardProps) {
             <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 {item.img ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
+                  <Image
                     src={item.img}
                     alt={item.name}
+                    width={48}
+                    height={48}
                     className="w-12 h-12 rounded-lg object-cover bg-gray-50 border border-purple-50"
                   />
                 ) : (
