@@ -121,6 +121,22 @@ describe("decodePaymentEvent", () => {
     expect(receipt?.contractId).toBeUndefined();
   });
 
+  it("does not fall back to the token address when the order id topic is missing", () => {
+    const event = makeEvent(
+      [
+        xdr.ScVal.scvSymbol("pay"),
+        addressScVal(TOKEN),
+        addressScVal(BUYER),
+        addressScVal(MERCHANT),
+      ],
+      amountMap(7n)
+    );
+    const receipt = decodePaymentEvent(makeTx([event]) as never);
+    expect(receipt).not.toBeNull();
+    expect(receipt?.orderId).toBeUndefined();
+    expect(receipt?.orderId).not.toBe(TOKEN);
+  });
+
   it("returns null when no pay event exists in the transaction", () => {
     expect(decodePaymentEvent(makeTx([]) as never)).toBeNull();
     expect(
