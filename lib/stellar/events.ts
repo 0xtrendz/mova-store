@@ -16,7 +16,7 @@ export interface PaymentReceipt {
   token?: string;
   buyer?: string;
   merchant?: string;
-  orderId?: string; // hex
+  orderId?: string; // hex; undefined when the event does not carry a resolvable id
   amount?: string; // raw token units as decimal string
   txHash: string;
   ledger: number;
@@ -113,6 +113,11 @@ export function decodePaymentEvent(
           receipt.orderId = str;
           break;
       }
+    }
+    // Fail loudly rather than fabricate identity: an event without an explicit
+    // order id must not silently fall back to the token contract address.
+    if (!receipt.orderId) {
+      return null;
     }
     // data = Map { "amount": i128 }
     if (data.switch() === xdr.ScValType.scvMap()) {
