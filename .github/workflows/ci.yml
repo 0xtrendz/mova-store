@@ -75,6 +75,21 @@ jobs:
           NEXT_PUBLIC_EMAILJS_TEMPLATE_ID: template_dummy
           NEXT_PUBLIC_EMAILJS_PUBLIC_KEY: dummy_key
 
+      # Measures what the client actually ships and uploads the report as an
+      # artifact. Report mode on purpose: a borderline size must not mask the
+      # lint/test signal. Run `npm run bundle:check` to enforce the budget
+      # documented in docs/BUNDLE_BUDGET.md.
+      - name: Bundle report
+        run: npm run bundle:report -- --json bundle-report.json
+
+      - name: Upload bundle report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-report
+          path: bundle-report.json
+          if-no-files-found: warn
+
       # Reported last: see the note above the ESLint step.
       - name: Check code formatting
         run: npm run format:check
