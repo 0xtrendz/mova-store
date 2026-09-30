@@ -164,6 +164,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # trufflehog walks the full history; the default shallow checkout only
+          # exposes the tip, so a secret committed and later removed would pass.
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
