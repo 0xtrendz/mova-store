@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   resolveOrderIdHash,
   isOrderIdHashHex,
@@ -131,5 +131,42 @@ describe("policy: ids the storefront mints are never 64 hex (issue #542)", () =>
   it("always hashes minted ids, so the policy holds end-to-end", async () => {
     const id = mint(1759012345678, 123456);
     expect(await resolveOrderIdHash(id)).toEqual(await hashOrderId(id));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #711 — crypto.subtle is only exposed in secure contexts, so a plain
+// HTTP origin used to fail with "Cannot read properties of undefined". The
+// hash helper feature-detects it and throws a typed, actionable error.
+// ---------------------------------------------------------------------------
+describe("issue #711: missing crypto.subtle", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("throws a typed, actionable error instead of a TypeError", async () => {
+    vi.stubGlobal("crypto", {});
+    await expect(hashOrderId(PRE_IMAGE_ID)).rejects.toMatchObject({
+      name: "WalletError",
+      code: "CRYPTO_UNAVAILABLE",
+    });
+  });
+
+  it("explains the secure-context requirement in the message", async () => {
+    vi.stubGlobal("crypto", {});
+    await expect(hashOrderId(PRE_IMAGE_ID)).rejects.toThrow(/secure context/i);
+  });
+
+  it("still passes a 64-hex id through without needing Web Crypto", async () => {
+    vi.stubGlobal("crypto", {});
+    const resolved = await resolveOrderIdHash(EVENT_DERIVED_ID);
+    expect(bytesToHex(resolved)).toBe(EVENT_DERIVED_ID);
+  });
+
+  it("surfaces the same typed error when resolving a pre-image id", async () => {
+    vi.stubGlobal("crypto", {});
+    await expect(resolveOrderIdHash(PRE_IMAGE_ID)).rejects.toMatchObject({
+      code: "CRYPTO_UNAVAILABLE",
+    });
   });
 });

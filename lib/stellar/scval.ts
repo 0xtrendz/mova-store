@@ -1,5 +1,7 @@
 import { xdr, Address, scValToNative, nativeToScVal } from "@stellar/stellar-sdk";
 
+import { WalletError } from "./freighter";
+
 // ---------------------------------------------------------------------------
 // ScVal construction + decoding helpers for the checkout contract.
 // The contract `pay` signature is:
@@ -124,9 +126,7 @@ export function hexToBytes(hex: string): Uint8Array {
   }
   const invalidIndex = clean.search(/[^0-9a-f]/i);
   if (invalidIndex !== -1) {
-    throw new Error(
-      `invalid hex character "${clean[invalidIndex]}" at index ${invalidIndex}`
-    );
+    throw new Error(`invalid hex character "${clean[invalidIndex]}" at index ${invalidIndex}`);
   }
   const out = new Uint8Array(clean.length / 2);
   for (let i = 0; i < out.length; i++) {
@@ -147,10 +147,24 @@ export function bytesToHex(bytes: Uint8Array): string {
 
 /**
  * SHA-256 a string order id into a 32-byte value accepted by the contract.
+ *
+ * Uses the Web Crypto API, which is only exposed in secure contexts (HTTPS or
+ * localhost). On a plain-HTTP origin `crypto.subtle` is `undefined`, so we
+ * feature-detect it and throw an actionable typed error instead of an opaque
+ * `TypeError`.
  */
 export async function hashOrderId(orderId: string): Promise<Uint8Array> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new WalletError(
+      "Order ids are hashed with SHA-256 via the Web Crypto API, which is only " +
+        "available in a secure context. Serve this app over HTTPS (or localhost) " +
+        "and try again.",
+      "CRYPTO_UNAVAILABLE"
+    );
+  }
   const data = new TextEncoder().encode(orderId);
-  const digest = await crypto.subtle.digest("SHA-256", data);
+  const digest = await subtle.digest("SHA-256", data);
   return new Uint8Array(digest);
 }
 
