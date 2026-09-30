@@ -212,4 +212,21 @@ describe("waitForTransaction", () => {
     await expect(waitForTransaction(TX_HASH)).rejects.toThrow("Transaction failed on ledger 101");
     spy.mockRestore();
   });
+
+  it("retries transient getTransaction failures and resolves on a later success", async () => {
+    const mockTx = {
+      status: "SUCCESS",
+      ledger: 102,
+      txHash: TX_HASH,
+    };
+    const spy = vi
+      .spyOn(rpc.Server.prototype, "getTransaction")
+      .mockRejectedValueOnce(new Error("transient RPC error"))
+      .mockResolvedValueOnce(mockTx as never);
+
+    const res = await waitForTransaction(TX_HASH);
+    expect(res).toBe(mockTx);
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
+  });
 });

@@ -32,9 +32,17 @@ export async function waitForTransaction(
   const server = new rpc.Server(RPC_URL);
   const deadline = Date.now() + TX_TIMEOUT_SECONDS * 1000;
   let last: rpc.Api.GetTransactionResponse | null = null;
+  let lastError: unknown = null;
 
   while (Date.now() < deadline) {
-    last = await server.getTransaction(hash);
+    try {
+      last = await server.getTransaction(hash);
+      lastError = null;
+    } catch (err) {
+      lastError = err;
+      await sleep(TX_POLL_INTERVAL_MS);
+      continue;
+    }
     if (last.status === rpc.Api.GetTransactionStatus.SUCCESS) {
       return last;
     }
@@ -47,6 +55,14 @@ export async function waitForTransaction(
     await sleep(TX_POLL_INTERVAL_MS);
   }
 
+  if (lastError) {
+    throw new Error(
+      `Transaction did not reach a final state within ${TX_TIMEOUT_SECONDS}s ` +
+        `(hash: ${hash}). Last RPC error: ${
+          lastError instanceof Error ? lastError.message : String(lastError)
+        }`
+    );
+  }
   throw new Error(
     `Transaction did not reach a final state within ${TX_TIMEOUT_SECONDS}s ` +
       `(hash: ${hash}). Check its status on StellarExpert.`
