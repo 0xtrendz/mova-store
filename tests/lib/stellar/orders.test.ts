@@ -14,6 +14,151 @@ vi.mock("../../../lib/stellar/freighter", () => ({
   signWithFreighter: vi.fn(),
 }));
 
+/**
+ * Real topic layouts declared in `contracts/checkout/src/events.rs`.
+ *
+ * The producer emits events with the following topic positions:
+ *
+ *   create_order: (symbol, order_id, buyer)          -> data: (amount)
+ *   pay:          (symbol, order_id, buyer)          -> data: (amount)
+ *   dispatch:     (symbol, order_id, buyer)          -> data: (amount)
+ *   refund:       (symbol, order_id, buyer)          -> data: (amount)
+ *
+ * `topic0` is the event symbol, `topic1` is the order id, `topic2` is the
+ * buyer. The order id is therefore always at `topic1`, never at `topic0`.
+ */
+const REAL_TOPIC_LAYOUT = {
+  create_order: { symbol: "create_order", orderIdIndex: 1, buyerIndex: 2 },
+  pay: { symbol: "pay", orderIdIndex: 1, buyerIndex: 2 },
+  dispatch: { symbol: "dispatch", orderIdIndex: 1, buyerIndex: 2 },
+  refund: { symbol: "refund", orderIdIndex: 1, buyerIndex: 2 },
+} as const;
+
+const ORDER_ID_A =
+  "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
+const ORDER_ID_B =
+  "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+const BUYER =
+  "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+const TX_HASH =
+  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+/**
+ * Builds an event fixture using the real topic positions declared by the
+ * producer. `topic0` is the symbol, `topic1` is the order id, `topic2` is the
+ * buyer. The order id is intentionally placed at `topic1` so that a mapping
+ * which mistakenly reads `topic0` (the symbol) as the order id will fail.
+ */
+function buildRealTopicEvent(
+  eventName: keyof typeof REAL_TOPIC_LAYOUT,
+  orderId: string,
+  buyer: string,
+  amount: string,
+  ledger: number,
+) {
+  const layout = REAL_TOPIC_LAYOUT[eventName];
+  const topics: string[] = [];
+  topics[0] = layout.symbol;
+  topics[layout.orderIdIndex] = orderId;
+  topics[layout.buyerIndex] = buyer;
+
+  return {
+    symbol: layout.symbol,
+    ledger,
+    txHash: TX_HASH,
+    fields: {
+      topic0: topics[0],
+      topic1: topics[1],
+      topic2: topics[2],
+      amount,
+    },
+  };
+}
+
+describe("eventToOrder real topic mapping (Issue #67)", () => {
+  it("maps create_order using the real topic layout", () => {
+    const event = buildRealTopicEvent(
+      "create_order",
+      ORDER_ID_A,
+      BUYER,
+      "50000000",
+      1000,
+    );
+
+    const order = eventToOrder(event);
+    expect(order).not.toBeNull();
+    expect(order?.orderId).toBe(ORDER_ID_A);
+    expect(order?.buyer).toBe(BUYER);
+    expect(order?.amount).toBe("50000000");
+  });
+
+  it("maps pay using the real topic layout", () => {
+    const event = buildRealTopicEvent(
+      "pay",
+      ORDER_ID_A,
+      BUYER,
+      "50000000",
+      1001,
+    );
+
+    const order = eventToOrder(event);
+    expect(order).not.toBeNull();
+    expect(order?.orderId).toBe(ORDER_ID_A);
+    expect(order?.buyer).toBe(BUYER);
+    expect(order?.amount).toBe("50000000");
+  });
+
+  it("maps dispatch using the real topic layout", () => {
+    const event = buildRealTopicEvent(
+      "dispatch",
+      ORDER_ID_B,
+      BUYER,
+      "50000000",
+      1002,
+    );
+
+    const order = eventToOrder(event);
+    expect(order).not.toBeNull();
+    expect(order?.orderId).toBe(ORDER_ID_B);
+    expect(order?.buyer).toBe(BUYER);
+    expect(order?.amount).toBe("50000000");
+  });
+
+  it("maps refund using the real topic layout", () => {
+    const event = buildRealTopicEvent(
+      "refund",
+      ORDER_ID_B,
+      BUYER,
+      "50000000",
+      1003,
+    );
+
+    const order = eventToOrder(event);
+    expect(order).not.toBeNull();
+    expect(order?.orderId).toBe(ORDER_ID_B);
+    expect(order?.buyer).toBe(BUYER);
+    expect(order?.amount).toBe("50000000");
+  });
+
+  it("fails if topic1 is used as the order id", () => {
+    const event = buildRealTopicEvent(
+      "pay",
+      ORDER_ID_A,
+      BUYER,
+      "50000000",
+      1004,
+    );
+
+    const order = eventToOrder(event);
+    expect(order).not.toBeNull();
+    // The order id must come from topic1, not topic0 (the symbol).
+    expect(order?.orderId).not.toBe(event.fields.topic0);
+    expect(order?.orderId).not.toBe("pay");
+    expect(order?.orderId).toBe(event.fields.topic1);
+    expect(order?.orderId).toBe(ORDER_ID_A);
+  });
+});
+
 describe("resolveOrderIdHash (Issue #67)", () => {
   const SAMPLE_64_HEX =
     "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
