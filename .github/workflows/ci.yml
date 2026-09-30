@@ -211,10 +211,34 @@ jobs:
         working-directory: contracts/checkout
         run: cargo audit
 
+  # Workflow YAML lint
+  #
+  # A duplicate `concurrency:` key silently disabled CI for two weeks: every run
+  # failed at 0s and no job executed because nothing validated the workflow file
+  # itself. actionlint parses .github/workflows/*.yml and fails on duplicate keys,
+  # unknown keys and syntax/expression errors, so this class of mistake surfaces as
+  # a red check instead of a silent no-op. Shellcheck is deliberately disabled
+  # (`-shellcheck=`) to keep this a pure workflow-YAML gate — the frontend and
+  # contracts jobs already lint the code they execute.
+  workflow-lint:
+    name: Workflow YAML Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download actionlint
+        run: bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.7
+
+      - name: Validate workflow YAML
+        run: ./actionlint -color -shellcheck=
+
   # Summary job that requires all checks to pass
   ci-success:
     name: CI Success
-    needs: [frontend, contracts, security, rust-security, test-naming]
+    needs: [frontend, contracts, security, rust-security, test-naming, workflow-lint]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
@@ -240,6 +264,10 @@ jobs:
           fi
           if [[ "${{ needs.test-naming.result }}" != "success" ]]; then
             echo "Test naming job failed"
+            exit 1
+          fi
+          if [[ "${{ needs.workflow-lint.result }}" != "success" ]]; then
+            echo "Workflow lint job failed"
             exit 1
           fi
           echo "All required checks passed!"
