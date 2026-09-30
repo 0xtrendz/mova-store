@@ -116,8 +116,8 @@ export default function OrderCard({ order }: OrderCardProps) {
       {/* Items Section */}
       <div className="p-4 sm:p-5 divide-y divide-gray-100">
         {order.items && order.items.length > 0 ? (
-          order.items.map((item, idx) => (
-            <div key={idx} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+          order.items.map((item) => (
+            <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 {item.img ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
