@@ -34,11 +34,31 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Next.js inlines NEXT_PUBLIC_* into the client bundle at build time, and
+# lib/supabase.js throws while collecting page data when the Supabase pair is
+# absent, so the build cannot succeed without them. Railway supplies service
+# variables to the build as Docker build args, which only reach the image when
+# declared here. Kept in sync with .env.local.example.
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_STELLAR_NETWORK
+ARG NEXT_PUBLIC_CHECKOUT_CONTRACT_ID
+ARG NEXT_PUBLIC_EMAILJS_SERVICE_ID
+ARG NEXT_PUBLIC_EMAILJS_TEMPLATE_ID
+ARG NEXT_PUBLIC_EMAILJS_PUBLIC_KEY
+ARG NEXT_PUBLIC_DEFAULT_RECIPIENT_EMAIL
+
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_STELLAR_NETWORK=$NEXT_PUBLIC_STELLAR_NETWORK
+ENV NEXT_PUBLIC_CHECKOUT_CONTRACT_ID=$NEXT_PUBLIC_CHECKOUT_CONTRACT_ID
+ENV NEXT_PUBLIC_EMAILJS_SERVICE_ID=$NEXT_PUBLIC_EMAILJS_SERVICE_ID
+ENV NEXT_PUBLIC_EMAILJS_TEMPLATE_ID=$NEXT_PUBLIC_EMAILJS_TEMPLATE_ID
+ENV NEXT_PUBLIC_EMAILJS_PUBLIC_KEY=$NEXT_PUBLIC_EMAILJS_PUBLIC_KEY
+ENV NEXT_PUBLIC_DEFAULT_RECIPIENT_EMAIL=$NEXT_PUBLIC_DEFAULT_RECIPIENT_EMAIL
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# NEXT_PUBLIC_* values must be present here: Next.js inlines them into the client
-# bundle, and lib/supabase.js throws while collecting page data when the Supabase
-# pair is absent. Railway injects the service variables into the build.
 RUN npm run build
 
 FROM node:22-bookworm-slim AS runner
