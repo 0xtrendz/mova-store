@@ -10,7 +10,6 @@ import useToast from "../hooks/useToast";
 import { useRouter } from "next/navigation";
 import { TfiAngleRight } from "react-icons/tfi";
 import { trapFocus } from "../lib/accessibility";
-import { trapFocus as trapFocusHelper } from "../lib/accessibility";
 
 const navLinkClass =
   "text-md font-medium text-mova-ink/80 hover:text-purple-600 transition-colors duration-200";
@@ -72,7 +71,6 @@ function Navbar() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showNav]);
-  const trapFocus = trapFocusHelper;
 
   useEffect(() => {
     if (!showNav) return;
