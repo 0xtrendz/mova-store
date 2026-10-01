@@ -1,37 +1,47 @@
 # Pinned production build for Railway.
 #
-# Why this exists instead of Railpack's auto-detected build: Railpack reuses a
-# cached node_modules between builds, and after the failed @stellar/stellar-sdk
-# v17 build that cache left a mix of v17 and v16 package files behind. The result
-# was a build that reported installing @stellar/stellar-sdk@16.3.0 while webpack
-# resolved a path (`./xdr/index.js`) that only exists in the v17 layout, so the
-# build failed with an unresolvable module that does not exist in the version it
-# claimed to install.
-#
-# Building in an explicit image with `npm ci` makes the install reproducible from
-# the lockfile and immune to a poisoned package cache. `npm ci` also removes
+# Why an explicit Dockerfile instead of the auto-detected builder: the host
+# builder reuses a cached node_modules between builds, and after a failed
+# @stellar/stellar-sdk v17 install that cache left a mixture of v17 and v16 files
+# behind. The build then reported installing 16.3.0 while webpack resolved a path
+# (`./xdr/index.js`) that only exists in the v17 layout. `npm ci` deletes
 # node_modules first, which is exactly the property that was missing.
 #
-# Node 20 matches .nvmrc.
+# Node 22 matches .nvmrc and satisfies @supabase/supabase-js, which requires
+# >=22.0.0 (Node 20 produced an EBADENGINE warning at install time).
+
+FROM node:22-bookworm-slim AS deps
+WORKDIR /app
+
+# .npmrc must be copied before installing. It sets legacy-peer-deps=true, and
+# package-lock.json was authored with that setting. Omit it and `npm ci` rejects
+# the lockfile as out of sync:
+#   Invalid: lock file's picomatch@2.3.2 does not satisfy picomatch@4.0.7
 #
-# Note: the NEXT_PUBLIC_* values must be present at *build* time - Next.js inlines
-# them into the client bundle, and lib/supabase.js throws while collecting page
-# data if the Supabase pair is missing. Railway injects the service variables into
-# the build, so no --build-arg wiring is needed here.
+# scripts/ is copied too because `npm ci` runs the root `prepare` script
+# (`node scripts/setup-git-hooks.mjs`). That script is a documented no-op outside
+# a git checkout and exits 0, but it still has to exist or node fails the install.
+COPY package.json package-lock.json .npmrc ./
+COPY scripts ./scripts
 
-FROM node:20-bookworm-slim AS deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# devDependencies are required, not optional: `next build` needs typescript,
+# tailwindcss and eslint. NODE_ENV=production would omit them.
+ENV NODE_ENV=development
+RUN npm ci --no-audit --no-fund --include=dev
 
-FROM node:20-bookworm-slim AS builder
+FROM node:22-bookworm-slim AS builder
 WORKDIR /app
+ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# NEXT_PUBLIC_* values must be present here: Next.js inlines them into the client
+# bundle, and lib/supabase.js throws while collecting page data when the Supabase
+# pair is absent. Railway injects the service variables into the build.
 RUN npm run build
 
-FROM node:20-bookworm-slim AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
