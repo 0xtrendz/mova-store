@@ -37,7 +37,7 @@ describe("CartContext removeFromCart", () => {
 
     expect(localStorage.getItem("itemCount")).toBe("1");
     expect(localStorage.getItem("totalPrice")).toBe("50");
-    expect(JSON.parse(localStorage.getItem("cartItems") || "[]")).toHaveLength(1);
+    expect((JSON.parse(localStorage.getItem("cartItems") || "{}").items || [])).toHaveLength(1);
   });
 
   it("leaves itemCount and totalPrice unchanged when removing an item not in the cart", () => {

@@ -82,7 +82,9 @@ describe("lib/stellar/config — mainnet resolution", () => {
     const mod = await import("../../../lib/stellar/config");
     expect(mod.SUPPORTED_TOKENS).toHaveLength(2);
     expect(mod.SUPPORTED_TOKENS[0].symbol).toBe("USDC");
-    expect(mod.SUPPORTED_TOKENS[0].isNative).toBe(false);
+    // `isNative` is only set on native assets (it means "needs no trustline"),
+    // so a non-native token omits it rather than declaring false.
+    expect(mod.SUPPORTED_TOKENS[0].isNative).toBeFalsy();
     expect(mod.SUPPORTED_TOKENS[1].symbol).toBe("XLM");
     expect(mod.SUPPORTED_TOKENS[1].isNative).toBe(true);
     expect(mod.defaultToken()).toBe(mod.SUPPORTED_TOKENS[0]);

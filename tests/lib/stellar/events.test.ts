@@ -129,20 +129,16 @@ describe("decodePaymentEvent", () => {
     expect(decodePaymentEvent(makeTx([event]) as never)).toBeNull();
   });
 
-  it("tolerates fewer than five topics (only fills the slots present)", () => {
+  it("rejects a pay event whose topics stop before the order id slot", () => {
     const event = makeEvent(
       [xdr.ScVal.scvSymbol("pay"), addressScVal(TOKEN)],
       amountMap(5n),
       null // no contract id -> system-style event
     );
-    const receipt = decodePaymentEvent(makeTx([event]) as never);
-    expect(receipt).not.toBeNull();
-    expect(receipt?.token).toBe(TOKEN);
-    expect(receipt?.buyer).toBeUndefined();
-    expect(receipt?.merchant).toBeUndefined();
-    expect(receipt?.orderId).toBeUndefined();
-    expect(receipt?.amount).toBe("5");
-    expect(receipt?.contractId).toBeUndefined();
+    // The topic layout is positional ([symbol, token, buyer, merchant, order_id]),
+    // so an event that stops short of the order id slot carries no order identity.
+    // It is rejected rather than reported against an unknown order.
+    expect(decodePaymentEvent(makeTx([event]) as never)).toBeNull();
   });
 
   it("does not fall back to the token address when the order id topic is missing", () => {
@@ -155,10 +151,9 @@ describe("decodePaymentEvent", () => {
       ],
       amountMap(7n)
     );
-    const receipt = decodePaymentEvent(makeTx([event]) as never);
-    expect(receipt).not.toBeNull();
-    expect(receipt?.orderId).toBeUndefined();
-    expect(receipt?.orderId).not.toBe(TOKEN);
+    // Rejecting outright is the strongest form of "does not fall back": the
+    // token address is exactly the value a buggy fallback would have substituted.
+    expect(decodePaymentEvent(makeTx([event]) as never)).toBeNull();
   });
 
   it("returns null when no pay event exists in the transaction", () => {

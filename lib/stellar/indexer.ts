@@ -304,13 +304,15 @@ export class PaymentEventIndexer {
       this.lastError = undefined;
 
       // Once a cursor is available, drop the start-ledger window so the next
-      // poll advances by cursor instead of re-scanning the backfill range.
-      if (this.startLedger !== undefined) {
-        this.startLedger = undefined;
-      }
+      // poll advances by cursor instead of re-scanning the backfill range. This
+      // has to stay inside the `if`: clearing it on a cursor-less response left
+      // the indexer with neither a cursor nor a start ledger, so every later
+      // poll threw "no cursor or start ledger to poll from" and the scan stopped
+      // advancing entirely.
       if (res.cursor) {
         this.cursor = res.cursor;
         this.persistCursor();
+        this.startLedger = undefined;
       }
 
       for (const raw of res.events) {

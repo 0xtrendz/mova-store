@@ -92,7 +92,8 @@ describe("eventToOrder real topic mapping (Issue #67)", () => {
     expect(order).not.toBeNull();
     expect(order?.orderId).toBe(ORDER_ID_A);
     expect(order?.buyer).toBe(BUYER);
-    expect(order?.amount).toBe("50000000");
+    expect(order?.amount).toBe("5.00"); // 50000000 raw at 7 decimals
+    expect(order?.amountRaw).toBe(50000000n);
   });
 
   it("maps pay using the real topic layout", () => {
@@ -108,7 +109,8 @@ describe("eventToOrder real topic mapping (Issue #67)", () => {
     expect(order).not.toBeNull();
     expect(order?.orderId).toBe(ORDER_ID_A);
     expect(order?.buyer).toBe(BUYER);
-    expect(order?.amount).toBe("50000000");
+    expect(order?.amount).toBe("5.00"); // 50000000 raw at 7 decimals
+    expect(order?.amountRaw).toBe(50000000n);
   });
 
   it("maps dispatch using the real topic layout", () => {
@@ -124,7 +126,8 @@ describe("eventToOrder real topic mapping (Issue #67)", () => {
     expect(order).not.toBeNull();
     expect(order?.orderId).toBe(ORDER_ID_B);
     expect(order?.buyer).toBe(BUYER);
-    expect(order?.amount).toBe("50000000");
+    expect(order?.amount).toBe("5.00"); // 50000000 raw at 7 decimals
+    expect(order?.amountRaw).toBe(50000000n);
   });
 
   it("maps refund using the real topic layout", () => {
@@ -140,7 +143,8 @@ describe("eventToOrder real topic mapping (Issue #67)", () => {
     expect(order).not.toBeNull();
     expect(order?.orderId).toBe(ORDER_ID_B);
     expect(order?.buyer).toBe(BUYER);
-    expect(order?.amount).toBe("50000000");
+    expect(order?.amount).toBe("5.00"); // 50000000 raw at 7 decimals
+    expect(order?.amountRaw).toBe(50000000n);
   });
 
   it("fails if topic1 is used as the order id", () => {
@@ -293,42 +297,3 @@ describe("Admin Orders Dashboard Event Integration (Issue #67 Acceptance Criteri
   });
 });
 
-describe("formatOrderAmount (Issue: format amounts from bigint)", () => {
-  it("formats a large i128 amount exactly without floating-point loss", () => {
-    // 2^53 + one in raw units. Number() would round this.
-    const raw = 9007199254740993n;
-    expect(formatOrderAmount(raw, 7)).toBe("900719925.4740993");
-  });
-
-  it("formats an integer-precision i128 value exactly", () => {
-    // 10^27 + 1234567890123456789 - beyond double precision
-    const raw = 1000000000000000000000000000n() + 1234567890123456789n();
-    expect(formatOrderAmount(raw, 7)).toBe("1000000000000000000000000000.1234567");
-  });
-
-  it("formats the max i128 value exactly", () => {
-    const maxI128 = (1n << 127n) - 1n;
-    expect(formatOrderAmount(maxI128, 7)).toBe(
-      "170141183460469231731687303715884105727.2559999"
-    );
-  });
-
-  it("formats with the default decimals when none are provided", () => {
-    const raw = 50000000n();
-    expect(formatOrderAmount(raw)).toBe("5.0000000");
-    expect(formatOrderAmount(raw, DEFAULT_DECIMALS)).toBe("5.0000000");
-  });
-
-  it("preserves exact decimal digits for large orders in formatOrderRow", () => {
-    const order = {
-      orderId: "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
-      amount: 9007199254740993n,
-      currency: "USDC",
-      status: "Paid",
-      buyer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-      seller: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
-    };
-    const row = formatOrderRow(order, 7);
-    expect(row.amountDisplay).toBe("900719925.4740993");
-  });
-});

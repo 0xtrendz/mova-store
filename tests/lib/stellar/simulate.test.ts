@@ -11,7 +11,7 @@ import {
 import { FEE_BUFFER_STROOPS, NETWORK_PASSPHRASE } from "../../../lib/stellar/config";
 
 describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts)", () => {
-  const buyerAddress = "GC6EQJ4UAFFFJDCLN37G4EWUJJJTMK3WE55NGIL4JXJXNXICUYKVBQ6";
+  const buyerAddress = "GC6EQJ4UAFFFJDECLN37G4EWUJJTMKE3WE55NGIL4JXJXNXICUYKVBQ6";
   const dummyAccount = new Account(buyerAddress, "100");
   const contractId = StrKey.encodeContract(new Uint8Array(32).fill(1));
   const dummyArgs: xdr.ScVal[] = [xdr.ScVal.scvSymbol("test")];
@@ -54,12 +54,12 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
       };
 
       const fee = await recommendedInclusionFee(stubServer as never);
-      expect(fee).toBle(BigInt(BASE_FEE));
+      expect(fee).toBe(BigInt(BASE_FEE));
     });
 
     it("falls back to BigInt(BASE_FEE) when getFeeStats throws an error", async () => {
       const stubServer = {
-        getFeeStats: vi.fn().mockRejected(new Error("RPC outage or network down")),
+        getFeeStats: vi.fn().mockRejectedValue(new Error("RPC outage or network down")),
       };
 
       const fee = await recommendedInclusionFee(stubServer as never);
@@ -168,10 +168,10 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
 
       const result = await simulateContractRead(
         stubServer as never,
-        dummyAccount,
         contractId,
         "test_func",
-        dummyArgs
+        dummyArgs,
+        buyerAddress
       );
 
       expect(result).toBeNull();
@@ -186,10 +186,10 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
 
       const result = await simulateContractRead(
         stubServer as never,
-        dummyAccount,
         contractId,
         "test_func",
-        dummyArgs
+        dummyArgs,
+        buyerAddress
       );
 
       expect(result).toBeNull();
@@ -197,16 +197,16 @@ describe("Simulate Fee Math & Transaction Builder Tests (lib/stellar/simulate.ts
 
     it("propagates a thrown simulation error", async () => {
       const stubServer = {
-        simulateTransaction: vi.fn().mockRejected(new Error("simulation failed")),
+        simulateTransaction: vi.fn().mockRejectedValue(new Error("simulation failed")),
       };
 
       await expect(
         simulateContractRead(
           stubServer as never,
-          dummyAccount,
           contractId,
           "test_func",
-          dummyArgs
+          dummyArgs,
+          buyerAddress
         )
       ).rejects.toThrow("simulation failed");
     });

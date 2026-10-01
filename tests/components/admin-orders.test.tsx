@@ -44,7 +44,7 @@ vi.mock("../../lib/stellar/indexer", () => {
           fields: {
             order_id: SAMPLE_64_HEX,
             topic1: "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBMLNUQ34T6TZMYMW2EVH34XOWMA",
-            topic2: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DDQEVFL4NAT4AQH3ZLLFLA5",
+            topic2: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
             amount: "100000000",
             token: "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBMLNUQ34T6TZMYMW2EVH34XOWMA",
           },
@@ -72,7 +72,7 @@ describe("Admin Orders Page (Process #67)", () => {
     fireEvent.click(shipBtn);
 
     const confirm = await screen.findByRole("button", {
-      name: /confirm/i,
+      name: /release escrow/i,
     });
     fireEvent.click(confirm);
 
@@ -93,7 +93,7 @@ describe("Admin Orders Page (Process #67)", () => {
     fireEvent.click(refundBtn);
 
     const confirm = await screen.findByRole("button", {
-      name: /confirm/i,
+      name: /refund buyer/i,
     });
     fireEvent.click(confirm);
 

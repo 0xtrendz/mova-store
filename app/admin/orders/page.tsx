@@ -326,7 +326,7 @@ const OrdersManagementContent = () => {
     } finally {
       setProcessingOrderId(null);
     }
-  }, []);
+  }, [orders, requestConfirmation]);
 
   // Handle refund order
   const handleRefund = useCallback(async (orderId: string) => {

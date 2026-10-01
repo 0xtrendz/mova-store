@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 
 // The indexer's `order_id` topic is the already-hashed BytesN32> as hex. The
 // admin page must hand that value to dispatchOrder/refundOrder untouched — no
@@ -74,10 +74,18 @@ describe("admin orders page — order id passed to dispatch/refund", () => {
     const ship = await screen.findByRole("button", { name: /ship/i });
     fireEvent.click(ship);
 
-    // The confirmation must name the order and the amount at stake.
-    const confirm = await screen.findByRole("button", { name: /confirm/i });
-    expect(screen.getByText(new RegExp(EVENT_DERIVED_ID, i))).toBeInTheDocument();
-    expect(screen.getByText(/10(\.\d{1,7})?/)).toBeInTheDocument();
+    // The dialog's confirm control is labelled by the action it performs
+    // ("Release escrow"), not by a generic "Confirm".
+    const confirm = await screen.findByRole("button", { name: /release escrow/i });
+    // The dialog truncates the id for display (6...4); it is the value handed to
+    // dispatchOrder, asserted below, that has to be the full 64 hex characters.
+    // The order row also displays the id and the amount, so scope these to the
+    // confirmation dialog to avoid matching both.
+    const dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).getByText(`${EVENT_DERIVED_ID.slice(0, 6)}...${EVENT_DERIVED_ID.slice(-4)}`)
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText(/10(\.\d{1,7})?/)).toBeInTheDocument();
     fireEvent.click(confirm);
 
     await waitFor(() => expect(dispatchOrder).toHaveBeenCalledTimes(1));
@@ -96,9 +104,16 @@ describe("admin orders page — order id passed to dispatch/refund", () => {
     const refund = await screen.findByRole("button", { name: /refund/i });
     fireEvent.click(refund);
 
-    const confirm = await screen.findByRole("button", { name: /confirm/i });
-    expect(screen.getByText(new RegExp(EVENT_DERIVED_ID, i))).toBeInTheDocument();
-    expect(screen.getByText(/10(\.\d{1,7})?/)).toBeInTheDocument();
+    const confirm = await screen.findByRole("button", { name: /refund buyer/i });
+    // The dialog truncates the id for display (6...4); it is the value handed to
+    // dispatchOrder, asserted below, that has to be the full 64 hex characters.
+    // The order row also displays the id and the amount, so scope these to the
+    // confirmation dialog to avoid matching both.
+    const dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).getByText(`${EVENT_DERIVED_ID.slice(0, 6)}...${EVENT_DERIVED_ID.slice(-4)}`)
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText(/10(\.\d{1,7})?/)).toBeInTheDocument();
     fireEvent.click(confirm);
 
     await waitFor(() => expect(refundOrder).toHaveBeenCalledTimes(1));
